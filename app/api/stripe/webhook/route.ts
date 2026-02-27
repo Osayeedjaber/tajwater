@@ -167,7 +167,7 @@ export async function POST(req: NextRequest) {
           if (refundedOrder) {
             const { data: refundItems } = await db.from('order_items').select('product_id, quantity').eq('order_id', refundedOrder.id)
             if (refundItems) {
-              await Promise.all(refundItems.map(item =>
+              await Promise.all(refundItems.map((item: { product_id: string; quantity: number }) =>
                 db.rpc('increment_stock', { product_id: item.product_id, amount: item.quantity })
               ))
             }
