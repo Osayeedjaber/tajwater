@@ -1,5 +1,5 @@
 import { createBrowserClient } from '@supabase/ssr'
-import { SupabaseClient } from '@supabase/supabase-js'
+import { createClient, SupabaseClient } from '@supabase/supabase-js'
 
 // Lazy browser client — only instantiated on first access, not at module load time.
 // Uses @supabase/ssr so the session is stored in cookies (not localStorage),
