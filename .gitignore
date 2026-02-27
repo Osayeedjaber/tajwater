@@ -39,3 +39,14 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# AI / Claude working files — not for version control
+CLAUDE.md
+ISSUES_AND_ROADMAP.md
+PLAN.md
+TODO.md
+AUDIT.md
+.mcp.json
+.claude/
+memory/
+docs/plans/
