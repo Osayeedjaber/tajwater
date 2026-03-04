@@ -147,6 +147,7 @@ create table if not exists public.services (
   pricing jsonb default '[]',
   icon text default 'Droplets',
   color text default '#0097a7',
+  image_url text,
   sort_order integer default 0,
   active boolean default true
 );
@@ -159,6 +160,7 @@ create table if not exists public.about_team (
   bio text,
   initials text,
   color text default '#0097a7',
+  image_url text,
   sort_order integer default 0,
   active boolean default true
 );

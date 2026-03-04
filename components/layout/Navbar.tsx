@@ -26,6 +26,7 @@ export default function Navbar() {
   const [isLoggedIn, setIsLoggedIn] = useState(false)
   const pathname = usePathname()
   const count = useCart((s) => s.count())
+  const cartHydrated = useCart((s) => s._hasHydrated)
 
   useEffect(() => {
     const onScroll = () => setScrolled(window.scrollY > 20)
@@ -47,7 +48,7 @@ export default function Navbar() {
   // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
-  if (pathname.startsWith('/admin') || pathname.startsWith('/auth')) return null
+  if (pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/dashboard')) return null
 
   const isHome = pathname === '/'
   const transparent = isHome && !scrolled
@@ -103,14 +104,14 @@ export default function Navbar() {
 
             {/* Actions */}
             <div className="hidden lg:flex items-center gap-3">
-              <Link href="/shop">
+              <Link href={cartHydrated && count > 0 ? '/checkout' : '/shop'}>
                 <Button
                   variant="ghost"
                   size="icon"
                   className={`relative ${transparent ? 'text-white hover:bg-white/15' : 'text-[#0c2340] hover:bg-[#e0f7fa]'}`}
                 >
                   <ShoppingCart className="w-5 h-5" />
-                  {count > 0 && (
+                  {cartHydrated && count > 0 && (
                     <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px] font-bold bg-[#0097a7] text-white rounded-full flex items-center justify-center">
                       {count}
                     </span>
@@ -188,6 +189,12 @@ export default function Navbar() {
                 )
               })}
               <div className="flex gap-3 mt-4 pt-4 border-t border-[#cce7f0]">
+                <Link href={cartHydrated && count > 0 ? '/checkout' : '/shop'} className="flex-none">
+                  <Button variant="outline" size="icon" className="border-[#cce7f0] text-[#0097a7] relative" onClick={() => setMobileOpen(false)}>
+                    <ShoppingCart className="w-4 h-4" />
+                    {cartHydrated && count > 0 && <span className="absolute -top-1 -right-1 w-4 h-4 text-[10px] font-bold bg-[#0097a7] text-white rounded-full flex items-center justify-center">{count}</span>}
+                  </Button>
+                </Link>
                 <Link href={isLoggedIn ? '/dashboard' : '/auth/login'} className="flex-1">
                   <Button variant="outline" className="w-full border-[#0097a7] text-[#0097a7]" onClick={() => setMobileOpen(false)}>
                     {isLoggedIn ? 'My Account' : 'Login'}

@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Building2, MapPin, DollarSign, Bell, CheckCircle2, RefreshCw, Mail, Download } from 'lucide-react'
+import { Building2, MapPin, DollarSign, Bell, CheckCircle2, RefreshCw, Mail, Download, Share2 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -59,6 +59,7 @@ export default function SettingsPage() {
   const [notifs,        setNotifs]        = useState<Record<string, boolean>>({})
   const [subscribers,   setSubscribers]   = useState<Subscriber[]>([])
   const [revenueGoal,   setRevenueGoal]   = useState('')
+  const [socials,       setSocialsState]  = useState({ facebook: '', instagram: '', twitter: '' })
   const [loading,       setLoading]       = useState(true)
   const [saving,        setSaving]        = useState(false)
   const [toast,         setToast]         = useState('')
@@ -72,6 +73,7 @@ export default function SettingsPage() {
     const allContentKeys = [
       'settings_company', 'settings_phone', 'settings_email', 'settings_address', 'settings_hours',
       'monthly_revenue_goal',
+      'social_facebook', 'social_instagram', 'social_twitter',
       ...NOTIF_KEYS.map(n => n.key),
     ]
 
@@ -99,8 +101,27 @@ export default function SettingsPage() {
       })
       setNotifs(notifState)
       setRevenueGoal(map['monthly_revenue_goal'] ?? '')
+      setSocialsState({
+        facebook:  map['social_facebook']  ?? '',
+        instagram: map['social_instagram'] ?? '',
+        twitter:   map['social_twitter']   ?? '',
+      })
     }
     setLoading(false)
+  }
+
+  // ── Save: Socials ──────────────────────────────────────────────────────────
+  const saveSocials = async () => {
+    setSaving(true)
+    const rows = [
+      { key: 'social_facebook',  value: socials.facebook  },
+      { key: 'social_instagram', value: socials.instagram },
+      { key: 'social_twitter',   value: socials.twitter   },
+    ]
+    const { error } = await supabase.from('site_content').upsert(rows, { onConflict: 'key' })
+    setSaving(false)
+    if (error) { showToast('Error saving — please try again.'); return }
+    showToast('Social links saved!')
   }
 
   // eslint-disable-next-line react-hooks/set-state-in-effect
@@ -177,6 +198,7 @@ export default function SettingsPage() {
           <TabsTrigger value="zones"         className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Zones & Fees</TabsTrigger>
           <TabsTrigger value="notifications" className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Notifications</TabsTrigger>
           <TabsTrigger value="subscribers"   className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Subscribers</TabsTrigger>
+          <TabsTrigger value="socials"        className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Socials</TabsTrigger>
         </TabsList>
 
         {/* ── Business tab ────────────────────────────────────────────── */}
@@ -419,6 +441,38 @@ export default function SettingsPage() {
                 </tbody>
               </table>
             </div>
+          </motion.div>
+        </TabsContent>
+        {/* ── Socials tab ──────────────────────────────────────────────── */}
+        <TabsContent value="socials">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl border border-[#cce7f0] shadow-sm p-6 space-y-4">
+            <div className="flex items-center gap-2 mb-2">
+              <Share2 className="w-5 h-5 text-[#0097a7]" />
+              <h3 className="font-bold text-[#0c2340]">Social Links</h3>
+              <span className="ml-auto text-xs text-[#4a7fa5]">Shown in Footer</span>
+            </div>
+            <p className="text-xs text-[#4a7fa5]">Leave a field blank to hide that icon from the footer.</p>
+
+            {[
+              { label: 'Facebook URL',  field: 'facebook'  as const, placeholder: 'https://facebook.com/yourpage' },
+              { label: 'Instagram URL', field: 'instagram' as const, placeholder: 'https://instagram.com/yourhandle' },
+              { label: 'Twitter / X URL', field: 'twitter' as const, placeholder: 'https://x.com/yourhandle' },
+            ].map(({ label, field, placeholder }) => (
+              <div key={field}>
+                <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">{label}</label>
+                <Input
+                  value={socials[field]}
+                  onChange={e => setSocialsState(prev => ({ ...prev, [field]: e.target.value }))}
+                  placeholder={placeholder}
+                  className="border-[#cce7f0]"
+                />
+              </div>
+            ))}
+
+            <Button onClick={saveSocials} disabled={saving || loading} className="bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white gap-2">
+              {saving ? 'Saving...' : <><CheckCircle2 className="w-4 h-4" /> Save Social Links</>}
+            </Button>
           </motion.div>
         </TabsContent>
       </Tabs>

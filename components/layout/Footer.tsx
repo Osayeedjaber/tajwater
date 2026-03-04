@@ -12,18 +12,24 @@ export default function Footer() {
   const [phone, setPhone] = useState(process.env.NEXT_PUBLIC_COMPANY_PHONE || '')
   const [email, setEmail] = useState(process.env.NEXT_PUBLIC_COMPANY_EMAIL || '')
   const [zones, setZones] = useState<string[]>([])
+  const [socials, setSocials] = useState({ facebook: '', instagram: '', twitter: '' })
 
   useEffect(() => {
     supabase
       .from('site_content')
       .select('key, value')
-      .in('key', ['settings_phone', 'settings_email'])
+      .in('key', ['settings_phone', 'settings_email', 'social_facebook', 'social_instagram', 'social_twitter'])
       .then(({ data }) => {
         if (!data) return
+        const fb: typeof socials = { facebook: '', instagram: '', twitter: '' }
         for (const row of data) {
           if (row.key === 'settings_phone') setPhone(row.value)
           if (row.key === 'settings_email') setEmail(row.value)
+          if (row.key === 'social_facebook')  fb.facebook  = row.value
+          if (row.key === 'social_instagram') fb.instagram = row.value
+          if (row.key === 'social_twitter')   fb.twitter   = row.value
         }
+        setSocials(fb)
       })
     supabase
       .from('zones')
@@ -61,11 +67,11 @@ export default function Footer() {
             </p>
             <div className="flex gap-3">
               {[
-                { icon: Facebook, href: '#' },
-                { icon: Instagram, href: '#' },
-                { icon: Twitter, href: '#' },
-              ].map(({ icon: Icon, href }, i) => (
-                <a key={i} href={href} className="w-9 h-9 rounded-lg bg-white/10 hover:bg-[#00bcd4] flex items-center justify-center text-white transition-all duration-200 hover:scale-110">
+                { icon: Facebook,  href: socials.facebook  || null },
+                { icon: Instagram, href: socials.instagram || null },
+                { icon: Twitter,   href: socials.twitter   || null },
+              ].filter(s => s.href).map(({ icon: Icon, href }, i) => (
+                <a key={i} href={href!} target="_blank" rel="noopener noreferrer" className="w-9 h-9 rounded-lg bg-white/10 hover:bg-[#00bcd4] flex items-center justify-center text-white transition-all duration-200 hover:scale-110">
                   <Icon className="w-4 h-4" />
                 </a>
               ))}

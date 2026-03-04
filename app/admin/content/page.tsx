@@ -12,12 +12,12 @@ import { AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent, 
 import { supabase } from '@/lib/supabase'
 
 // ─── Types ───────────────────────────────────────────────
-interface TeamMember { id: string; name: string; role: string; bio: string; initials: string; color: string; sort_order: number; active: boolean }
-interface Service { id: string; title: string; description: string; features: string[]; pricing: { label: string; price: string }[]; icon: string; color: string; sort_order: number; active: boolean }
+interface TeamMember { id: string; name: string; role: string; bio: string; initials: string; color: string; image_url?: string | null; sort_order: number; active: boolean }
+interface Service { id: string; title: string; description: string; features: string[]; pricing: { label: string; price: string }[]; icon: string; color: string; image_url?: string | null; sort_order: number; active: boolean }
 interface SiteContent { id: string; key: string; value: string }
 
-const emptyMember: Omit<TeamMember, 'id'> = { name: '', role: '', bio: '', initials: '', color: '#0097a7', sort_order: 0, active: true }
-const emptyService: Omit<Service, 'id'> = { title: '', description: '', features: [], pricing: [], icon: 'Droplets', color: '#0097a7', sort_order: 0, active: true }
+const emptyMember: Omit<TeamMember, 'id'> = { name: '', role: '', bio: '', initials: '', color: '#0097a7', image_url: null, sort_order: 0, active: true }
+const emptyService: Omit<Service, 'id'> = { title: '', description: '', features: [], pricing: [], icon: 'Droplets', color: '#0097a7', image_url: null, sort_order: 0, active: true }
 
 const iconOptions = ['Droplets', 'Settings', 'Building2', 'RefreshCw', 'Clock', 'Shield']
 const colorOptions = ['#0097a7', '#1565c0', '#006064', '#00acc1', '#1976d2', '#004d40']
@@ -52,6 +52,8 @@ export default function AdminContentPage() {
   const [pricingText, setPricingText] = useState('')
 
   const [confirmDelete, setConfirmDelete] = useState<{ type: 'member' | 'service'; id: string } | null>(null)
+  const [photoUploading, setPhotoUploading] = useState(false)
+  const [servicePhotoUploading, setServicePhotoUploading] = useState(false)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -84,20 +86,43 @@ export default function AdminContentPage() {
     showToast('Content saved!')
   }
 
+  const uploadTeamPhoto = async (file: File): Promise<string | null> => {
+    setPhotoUploading(true)
+    const ext = file.name.split('.').pop() ?? 'jpg'
+    const path = `team/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('about-team').upload(path, file, { upsert: true })
+    setPhotoUploading(false)
+    if (error) { showToast('Upload failed: ' + error.message); return null }
+    const { data } = supabase.storage.from('about-team').getPublicUrl(path)
+    return data.publicUrl
+  }
+
+  const uploadServiceImage = async (file: File): Promise<string | null> => {
+    setServicePhotoUploading(true)
+    const ext = file.name.split('.').pop() ?? 'jpg'
+    const path = `services/${Date.now()}.${ext}`
+    const { error } = await supabase.storage.from('services-images').upload(path, file, { upsert: true })
+    setServicePhotoUploading(false)
+    if (error) { showToast('Upload failed: ' + error.message); return null }
+    const { data } = supabase.storage.from('services-images').getPublicUrl(path)
+    return data.publicUrl
+  }
+
   // ─── Team CRUD ────────────────────────────────────────
   const openAddMember = () => { setEditingMember(null); setMemberForm(emptyMember); setMemberDialog(true) }
   const openEditMember = (m: TeamMember) => {
     setEditingMember(m)
-    setMemberForm({ name: m.name, role: m.role, bio: m.bio, initials: m.initials, color: m.color, sort_order: m.sort_order, active: m.active })
+    setMemberForm({ name: m.name, role: m.role, bio: m.bio, initials: m.initials, color: m.color, image_url: m.image_url ?? null, sort_order: m.sort_order, active: m.active })
     setMemberDialog(true)
   }
 
   const saveMember = async (e: React.FormEvent) => {
     e.preventDefault()
+    const payload = { ...memberForm }
     if (editingMember) {
-      await supabase.from('about_team').update(memberForm).eq('id', editingMember.id)
+      await supabase.from('about_team').update(payload).eq('id', editingMember.id)
     } else {
-      await supabase.from('about_team').insert(memberForm)
+      await supabase.from('about_team').insert(payload)
     }
     showToast(editingMember ? 'Team member updated!' : 'Team member added!')
     setMemberDialog(false)
@@ -126,7 +151,7 @@ export default function AdminContentPage() {
 
   const openEditService = (s: Service) => {
     setEditingService(s)
-    setServiceForm({ title: s.title, description: s.description, features: s.features, pricing: s.pricing, icon: s.icon, color: s.color, sort_order: s.sort_order, active: s.active })
+    setServiceForm({ title: s.title, description: s.description, features: s.features, pricing: s.pricing, icon: s.icon, color: s.color, image_url: s.image_url ?? null, sort_order: s.sort_order, active: s.active })
     setFeaturesText(s.features.join('\n'))
     setPricingText(s.pricing.map((p) => `${p.label}|${p.price}`).join('\n'))
     setServiceDialog(true)
@@ -243,9 +268,13 @@ export default function AdminContentPage() {
                       <Trash2 className="w-3 h-3" />
                     </button>
                   </div>
-                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-3 shadow-md"
-                    style={{ background: `linear-gradient(135deg, ${member.color}, ${member.color}99)` }}>
-                    {member.initials}
+                  <div className="w-14 h-14 rounded-2xl flex items-center justify-center text-white font-bold text-lg mx-auto mb-3 shadow-md overflow-hidden"
+                    style={member.image_url ? {} : { background: `linear-gradient(135deg, ${member.color}, ${member.color}99)` }}>
+                    {member.image_url
+                      // eslint-disable-next-line @next/next/no-img-element
+                      ? <img src={member.image_url} alt={member.name} className="w-full h-full object-cover" />
+                      : member.initials
+                    }
                   </div>
                   <p className="font-bold text-[#0c2340] text-sm">{member.name}</p>
                   <p className="text-xs font-medium mb-2" style={{ color: member.color }}>{member.role}</p>
@@ -269,13 +298,17 @@ export default function AdminContentPage() {
                 <motion.div key={svc.id} initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: i * 0.07 }}
                   className="bg-white rounded-2xl border border-[#cce7f0] shadow-sm p-5">
                   <div className="flex items-start gap-4">
-                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0" style={{ background: svc.color + '22' }}>
-                      {svc.icon === 'Droplets'   ? <Droplets   className="w-6 h-6" style={{ color: svc.color }} /> :
-                       svc.icon === 'Settings'   ? <Settings   className="w-6 h-6" style={{ color: svc.color }} /> :
-                       svc.icon === 'RefreshCw'  ? <RefreshCw  className="w-6 h-6" style={{ color: svc.color }} /> :
-                       svc.icon === 'Clock'      ? <Clock      className="w-6 h-6" style={{ color: svc.color }} /> :
-                       svc.icon === 'Shield'     ? <Shield     className="w-6 h-6" style={{ color: svc.color }} /> :
-                       <Building2 className="w-6 h-6" style={{ color: svc.color }} />}
+                    <div className="w-12 h-12 rounded-xl flex items-center justify-center shrink-0 overflow-hidden" style={svc.image_url ? {} : { background: svc.color + '22' }}>
+                      {svc.image_url
+                        // eslint-disable-next-line @next/next/no-img-element
+                        ? <img src={svc.image_url} alt={svc.title} className="w-full h-full object-cover" />
+                        : (svc.icon === 'Droplets'   ? <Droplets   className="w-6 h-6" style={{ color: svc.color }} /> :
+                           svc.icon === 'Settings'   ? <Settings   className="w-6 h-6" style={{ color: svc.color }} /> :
+                           svc.icon === 'RefreshCw'  ? <RefreshCw  className="w-6 h-6" style={{ color: svc.color }} /> :
+                           svc.icon === 'Clock'      ? <Clock      className="w-6 h-6" style={{ color: svc.color }} /> :
+                           svc.icon === 'Shield'     ? <Shield     className="w-6 h-6" style={{ color: svc.color }} /> :
+                           <Building2 className="w-6 h-6" style={{ color: svc.color }} />)
+                      }
                     </div>
                     <div className="flex-1">
                       <div className="flex items-center gap-2 mb-1">
@@ -318,6 +351,40 @@ export default function AdminContentPage() {
             <DialogTitle>{editingMember ? 'Edit Team Member' : 'Add Team Member'}</DialogTitle>
           </DialogHeader>
           <form onSubmit={saveMember} className="space-y-4 mt-2">
+            <div>
+              <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Profile Photo</label>
+              <div className="flex items-center gap-4">
+                {memberForm.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={memberForm.image_url} alt="preview" className="w-14 h-14 rounded-xl object-cover border border-[#cce7f0]" />
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="team-photo-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const url = await uploadTeamPhoto(file)
+                      if (url) setMemberForm(prev => ({ ...prev, image_url: url }))
+                    }}
+                  />
+                  <label htmlFor="team-photo-upload">
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-[#0097a7] text-[#0097a7] text-xs cursor-pointer hover:bg-[#e0f7fa] transition-colors ${photoUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                      {photoUploading ? 'Uploading…' : 'Click to upload photo'}
+                    </div>
+                  </label>
+                  {memberForm.image_url && (
+                    <button type="button" onClick={() => setMemberForm(prev => ({ ...prev, image_url: null }))}
+                      className="mt-1 text-xs text-red-500 hover:text-red-700">
+                      Remove photo
+                    </button>
+                  )}
+                </div>
+              </div>
+            </div>
             <div className="grid grid-cols-2 gap-4">
               <div>
                 <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Full Name *</label>
@@ -374,6 +441,40 @@ export default function AdminContentPage() {
             <div>
               <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Description</label>
               <Textarea value={serviceForm.description} onChange={(e) => setServiceForm({ ...serviceForm, description: e.target.value })} rows={3} className="border-[#cce7f0] resize-none" />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Service Image</label>
+              <div className="flex items-center gap-4">
+                {serviceForm.image_url && (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={serviceForm.image_url} alt="preview" className="w-16 h-16 rounded-xl object-cover border border-[#cce7f0]" />
+                )}
+                <div className="flex-1">
+                  <input
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    id="service-image-upload"
+                    onChange={async (e) => {
+                      const file = e.target.files?.[0]
+                      if (!file) return
+                      const url = await uploadServiceImage(file)
+                      if (url) setServiceForm(prev => ({ ...prev, image_url: url }))
+                    }}
+                  />
+                  <label htmlFor="service-image-upload">
+                    <div className={`flex items-center gap-2 px-3 py-2 rounded-xl border border-dashed border-[#0097a7] text-[#0097a7] text-xs cursor-pointer hover:bg-[#e0f7fa] transition-colors ${servicePhotoUploading ? 'opacity-60 pointer-events-none' : ''}`}>
+                      {servicePhotoUploading ? 'Uploading…' : 'Click to upload service image'}
+                    </div>
+                  </label>
+                  {serviceForm.image_url && (
+                    <button type="button" onClick={() => setServiceForm(prev => ({ ...prev, image_url: null }))}
+                      className="mt-1 text-xs text-red-500 hover:text-red-700">
+                      Remove image
+                    </button>
+                  )}
+                </div>
+              </div>
             </div>
             <div>
               <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Features (one per line)</label>

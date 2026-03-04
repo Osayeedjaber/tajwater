@@ -1,9 +1,7 @@
 import type { Metadata } from 'next'
 import { Geist } from 'next/font/google'
 import './globals.css'
-import Navbar from '@/components/layout/Navbar'
-import Footer from '@/components/layout/Footer'
-import FloatingOrderButton from '@/components/shared/FloatingOrderButton'
+import ConditionalShell from '@/components/layout/ConditionalShell'
 
 const geist = Geist({ subsets: ['latin'], variable: '--font-geist-sans' })
 
@@ -202,10 +200,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
         <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(websiteJsonLd) }} />
       </head>
       <body className="antialiased bg-[#f0f9ff]">
-        <Navbar />
-        <main>{children}</main>
-        <Footer />
-        <FloatingOrderButton />
+        <ConditionalShell>{children}</ConditionalShell>
       </body>
     </html>
   )

@@ -7,7 +7,7 @@ import FloatingOrderButton from '@/components/shared/FloatingOrderButton'
 
 export default function ConditionalShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const hideShell = pathname.startsWith('/admin') || pathname.startsWith('/auth')
+  const hideShell = pathname.startsWith('/admin') || pathname.startsWith('/auth') || pathname.startsWith('/dashboard')
 
   return (
     <>

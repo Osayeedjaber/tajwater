@@ -158,9 +158,9 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   }
 
   return (
-    <div className="min-h-screen bg-[#f0f9ff] flex pt-16">
+    <div className="min-h-screen bg-[#f0f9ff] flex">
       {/* Desktop sidebar */}
-      <aside className="hidden lg:flex w-60 flex-col bg-white border-r border-[#cce7f0] fixed top-16 bottom-0 left-0 z-30">
+      <aside className="hidden lg:flex w-60 flex-col bg-white border-r border-[#cce7f0] fixed top-0 bottom-0 left-0 z-30">
         <Sidebar pathname={pathname} setSidebarOpen={setSidebarOpen} userName={userName} userAvatar={userAvatar} userInitials={userInitials} handleLogout={handleLogout} />
       </aside>
 
@@ -192,7 +192,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       {/* Main */}
       <div className="flex-1 lg:ml-60">
         {/* Top bar */}
-        <div className="h-14 bg-white border-b border-[#cce7f0] flex items-center px-4 sm:px-6 gap-4 sticky top-16 z-20">
+        <div className="h-14 bg-white border-b border-[#cce7f0] flex items-center px-4 sm:px-6 gap-4 sticky top-0 z-20">
           <button onClick={() => setSidebarOpen(true)} className="lg:hidden p-1.5 rounded-lg hover:bg-[#e0f7fa] text-[#4a7fa5]">
             <Menu className="w-5 h-5" />
           </button>

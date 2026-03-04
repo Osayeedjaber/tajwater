@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Search, RefreshCw, Package, Truck, CheckCircle2, Clock, XCircle, Droplets, ShoppingBag, Download, RotateCcw } from 'lucide-react'
+import { Search, RefreshCw, Package, Truck, CheckCircle2, Clock, XCircle, Droplets, ShoppingBag, Download, RotateCcw, Eye } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import Link from 'next/link'
@@ -15,6 +15,46 @@ const statusConfig = {
   out_for_delivery: { label: 'Out for Delivery', icon: Truck, color: 'bg-[#e0f7fa] text-[#0097a7]' },
   delivered: { label: 'Delivered', icon: CheckCircle2, color: 'bg-green-100 text-green-700' },
   cancelled: { label: 'Cancelled', icon: XCircle, color: 'bg-red-100 text-red-700' },
+}
+
+const DELIVERY_STEPS = [
+  { key: 'pending',          label: 'Placed' },
+  { key: 'processing',       label: 'Processing' },
+  { key: 'out_for_delivery', label: 'On the Way' },
+  { key: 'delivered',        label: 'Delivered' },
+]
+
+function DeliveryProgress({ status }: { status: string }) {
+  if (status === 'cancelled') return null
+  const currentIdx = DELIVERY_STEPS.findIndex(s => s.key === status)
+  return (
+    <div className="flex items-center gap-0 mt-3 pt-3 border-t border-[#f0f9ff]">
+      {DELIVERY_STEPS.map((step, idx) => {
+        const done   = idx < currentIdx || status === 'delivered'
+        const active = idx === currentIdx && status !== 'delivered'
+        const last   = idx === DELIVERY_STEPS.length - 1
+        return (
+          <div key={step.key} className="flex items-center flex-1 min-w-0">
+            <div className="flex flex-col items-center shrink-0">
+              <div className={`w-5 h-5 rounded-full flex items-center justify-center transition-all
+                ${done   ? 'bg-[#0097a7] text-white' :
+                  active ? 'bg-[#1565c0] text-white ring-2 ring-[#1565c0]/25 ring-offset-1' :
+                  'bg-[#f0f9ff] text-[#4a7fa5] border border-[#cce7f0]'}`}>
+                {done ? <CheckCircle2 className="w-3 h-3" /> : <span className="text-[9px] font-bold">{idx + 1}</span>}
+              </div>
+              <span className={`text-[9px] mt-1 font-medium text-center leading-tight max-w-[52px]
+                ${active ? 'text-[#1565c0]' : done ? 'text-[#0097a7]' : 'text-[#4a7fa5]'}`}>
+                {step.label}
+              </span>
+            </div>
+            {!last && (
+              <div className={`flex-1 h-0.5 mx-1 mb-3 ${idx < currentIdx || status === 'delivered' ? 'bg-[#0097a7]' : 'bg-[#e0f7fa]'}`} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
 }
 
 interface OrderRow {
@@ -206,8 +246,14 @@ export default function OrdersPage() {
                       className="border-[#cce7f0] text-[#4a7fa5] gap-1 h-8" title="Add items to cart">
                       <RotateCcw className="w-3.5 h-3.5" /> Reorder
                     </Button>
+                    <Link href={`/dashboard/orders/${order.id}`}>
+                      <Button size="sm" variant="outline" className="border-[#cce7f0] text-[#0097a7] gap-1 h-8">
+                        <Eye className="w-3.5 h-3.5" /> Details
+                      </Button>
+                    </Link>
                   </div>
                 </div>
+                <DeliveryProgress status={order.status} />
               </motion.div>
             )
           })}

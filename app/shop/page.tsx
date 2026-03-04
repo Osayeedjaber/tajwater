@@ -28,7 +28,7 @@ export default function ShopPage() {
   const [addedId, setAddedId] = useState<string | null>(null)
   const [subscribeMode, setSubscribeMode] = useState<Record<string, boolean>>({})
   const [subFreq, setSubFreq] = useState<Record<string, 'weekly' | 'biweekly' | 'monthly'>>({})
-  const { items, addItem, updateQuantity, count } = useCart()
+  const { items, addItem, updateQuantity, count, _hasHydrated } = useCart()
 
   useEffect(() => {
     const fetchProducts = async () => {
@@ -105,7 +105,7 @@ export default function ShopPage() {
               <Button className="h-11 gap-2 bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white font-semibold px-5 relative">
                 <ShoppingCart className="w-4 h-4" />
                 Cart
-                {count() > 0 && (
+                {_hasHydrated && count() > 0 && (
                   <span className="absolute -top-1.5 -right-1.5 w-5 h-5 rounded-full bg-white text-[#0097a7] text-[10px] font-bold flex items-center justify-center">
                     {count()}
                   </span>
@@ -155,8 +155,9 @@ export default function ShopPage() {
 
                   return (
                     <motion.div key={product.id} layout initial={{ opacity: 0, y: 30 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, scale: 0.95 }} transition={{ delay: i * 0.06 }}
-                      className="water-card bg-white rounded-3xl border border-[#cce7f0] overflow-hidden shadow-sm">
-                      <div className="h-44 flex items-center justify-center relative overflow-hidden" style={{ background: `linear-gradient(135deg, ${color}15, ${color}30)` }}>
+                      className="water-card bg-white rounded-3xl border border-[#cce7f0] overflow-hidden shadow-sm hover:shadow-md hover:border-[#0097a7]/30 transition-all">
+                      <Link href={`/shop/${product.id}`}>
+                        <div className="h-44 flex items-center justify-center relative overflow-hidden cursor-pointer" style={{ background: `linear-gradient(135deg, ${color}15, ${color}30)` }}>
                         {product.image_url ? (
                           // eslint-disable-next-line @next/next/no-img-element
                           <img src={product.image_url} alt={product.name} className="w-full h-full object-contain p-3" />
@@ -173,10 +174,13 @@ export default function ShopPage() {
                           <Badge className="absolute bottom-3 right-3 bg-orange-400 text-[10px]">Low Stock</Badge>
                         )}
                       </div>
+                      </Link>
 
                       <div className="p-5">
-                        <h3 className="font-bold text-[#0c2340] mb-1.5">{product.name}</h3>
-                        <p className="text-[#4a7fa5] text-xs leading-relaxed mb-4 line-clamp-2">{product.description}</p>
+                        <Link href={`/shop/${product.id}`} className="group block mb-4">
+                          <h3 className="font-bold text-[#0c2340] mb-1.5 group-hover:text-[#0097a7] transition-colors">{product.name}</h3>
+                          <p className="text-[#4a7fa5] text-xs leading-relaxed line-clamp-2">{product.description}</p>
+                        </Link>
                         <div className="flex items-center gap-1 mb-4">
                           {[...Array(5)].map((_, i) => <Star key={i} className="w-3 h-3 fill-amber-400 text-amber-400" />)}
                           <span className="text-xs text-[#4a7fa5] ml-1">(4.9)</span>

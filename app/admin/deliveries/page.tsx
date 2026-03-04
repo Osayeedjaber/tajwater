@@ -2,20 +2,24 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Truck, MapPin, Users, Clock, RefreshCw, CheckCircle2, Package, Printer, Filter } from 'lucide-react'
+import { Truck, MapPin, Users, Clock, RefreshCw, CheckCircle2, Package, Printer, Filter, Download } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
+import { exportCSV } from '@/lib/csv'
 
 type DeliveryOrder = {
   id: string
   status: string
   driver_name: string | null
+  customer_name: string | null
+  customer_phone: string | null
   zones: { name: string } | { name: string }[] | null
   total: number
   delivery_address: string | null
   notes: string | null
   created_at: string
+  order_items: { quantity: number; products: { name: string } | null }[]
 }
 
 function getZoneName(zones: DeliveryOrder['zones']): string {
@@ -54,6 +58,11 @@ function fmtDate(ts: string) {
 }
 function shortId(id: string) { return '#TW-' + id.slice(-6).toUpperCase() }
 
+function itemsSummary(items: DeliveryOrder['order_items']) {
+  if (!items || items.length === 0) return '—'
+  return items.map(i => `${i.quantity}× ${i.products?.name ?? 'Item'}`).join(', ')
+}
+
 export default function DeliveriesPage() {
   const [orders,       setOrders]       = useState<DeliveryOrder[]>([])
   const [loading,      setLoading]      = useState(true)
@@ -65,7 +74,7 @@ export default function DeliveriesPage() {
     // Fetch ALL active orders (not just today — show everything in the pipeline)
     const { data, error } = await supabase
       .from('orders')
-      .select('id, status, driver_name, total, delivery_address, notes, created_at, zones(name)')
+      .select('id, status, driver_name, customer_name, customer_phone, total, delivery_address, notes, created_at, zones(name), order_items(quantity, products(name))')
       .in('status', ['pending', 'processing', 'out_for_delivery', 'delivered'])
       .order('created_at', { ascending: false })
       .limit(300)
@@ -148,6 +157,24 @@ export default function DeliveriesPage() {
             className={`border-[#cce7f0] gap-1.5 ${todayOnly ? 'bg-[#0097a7] text-white border-[#0097a7]' : 'text-[#4a7fa5]'}`}>
             <Filter className="w-3.5 h-3.5" /> Today Only
           </Button>
+          <Button size="sm" variant="outline"
+            onClick={() => exportCSV(`delivery-manifest-${new Date().toISOString().slice(0,10)}.csv`,
+              manifestOrders.map(o => ({
+                order_id: shortId(o.id),
+                customer: o.customer_name ?? '—',
+                phone: o.customer_phone ?? '—',
+                zone: getZoneName(o.zones),
+                address: o.delivery_address ?? '—',
+                items: itemsSummary(o.order_items),
+                driver: o.driver_name ?? 'Unassigned',
+                status: o.status.replace(/_/g, ' '),
+                notes: o.notes ?? '',
+                total: Number(o.total).toFixed(2),
+              }))
+            )}
+            className="border-[#cce7f0] text-[#4a7fa5] gap-1.5">
+            <Download className="w-3.5 h-3.5" /> Export CSV
+          </Button>
           <Button size="sm" variant="outline" onClick={() => window.print()}
             className="border-[#cce7f0] text-[#4a7fa5] gap-1.5">
             <Printer className="w-3.5 h-3.5" /> Print Manifest
@@ -166,40 +193,57 @@ export default function DeliveriesPage() {
             <p className="text-xs">{new Date().toLocaleDateString('en-CA', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</p>
           </div>
           <div className="text-right text-xs">
-            <p>Total orders: {manifestOrders.length}</p>
+            <p>Total stops: {manifestOrders.length}</p>
             <p>Printed: {new Date().toLocaleTimeString('en-CA', { hour: '2-digit', minute: '2-digit' })}</p>
           </div>
         </div>
         {Object.entries(manifestByZone).map(([zone, zoneOrders]) => (
-          <div key={zone} className="mb-5">
-            <h2 className="font-bold text-base border-b border-gray-300 pb-1 mb-2">{zone} ({zoneOrders.length} stops)</h2>
-            <table className="w-full text-xs border-collapse">
+          <div key={zone} className="mb-6">
+            <h2 className="font-bold text-base border-b-2 border-black pb-1 mb-2">{zone} — {zoneOrders.length} stop{zoneOrders.length !== 1 ? 's' : ''}</h2>
+            <table className="w-full text-xs border-collapse mb-1">
               <thead>
                 <tr className="bg-gray-100">
-                  <th className="text-left p-1.5 border border-gray-300 w-20">Order</th>
+                  <th className="text-left p-1.5 border border-gray-300 w-16">Order</th>
+                  <th className="text-left p-1.5 border border-gray-300 w-24">Customer</th>
+                  <th className="text-left p-1.5 border border-gray-300 w-24">Phone</th>
                   <th className="text-left p-1.5 border border-gray-300">Address</th>
-                  <th className="text-left p-1.5 border border-gray-300">Driver</th>
-                  <th className="text-left p-1.5 border border-gray-300">Status</th>
-                  <th className="text-left p-1.5 border border-gray-300">Notes</th>
-                  <th className="text-right p-1.5 border border-gray-300 w-16">Total</th>
+                  <th className="text-left p-1.5 border border-gray-300">Items</th>
+                  <th className="text-left p-1.5 border border-gray-300 w-20">Driver</th>
+                  <th className="text-left p-1.5 border border-gray-300 w-28">Notes</th>
+                  <th className="text-right p-1.5 border border-gray-300 w-14">Total</th>
+                  <th className="text-center p-1.5 border border-gray-300 w-14">✓ Done</th>
                 </tr>
               </thead>
               <tbody>
                 {zoneOrders.map(o => (
                   <tr key={o.id} className="border border-gray-200">
                     <td className="p-1.5 border border-gray-200 font-mono font-bold">{shortId(o.id)}</td>
+                    <td className="p-1.5 border border-gray-200">{o.customer_name ?? '—'}</td>
+                    <td className="p-1.5 border border-gray-200">{o.customer_phone ?? '—'}</td>
                     <td className="p-1.5 border border-gray-200">{o.delivery_address ?? '—'}</td>
+                    <td className="p-1.5 border border-gray-200">{itemsSummary(o.order_items)}</td>
                     <td className="p-1.5 border border-gray-200">{o.driver_name ?? '—'}</td>
-                    <td className="p-1.5 border border-gray-200 capitalize">{o.status.replace(/_/g, ' ')}</td>
                     <td className="p-1.5 border border-gray-200 text-gray-600">{o.notes ?? ''}</td>
                     <td className="p-1.5 border border-gray-200 text-right font-bold">${o.total.toFixed(2)}</td>
+                    <td className="p-1.5 border border-gray-200 text-center text-base">{o.status === 'delivered' ? '✓' : '□'}</td>
                   </tr>
                 ))}
               </tbody>
+              <tfoot>
+                <tr className="bg-gray-50">
+                  <td colSpan={7} className="p-1.5 border border-gray-300 font-bold text-right">Zone Total:</td>
+                  <td className="p-1.5 border border-gray-300 text-right font-bold">${zoneOrders.reduce((s, o) => s + Number(o.total), 0).toFixed(2)}</td>
+                  <td className="border border-gray-300" />
+                </tr>
+              </tfoot>
             </table>
+            <p className="text-xs text-gray-500 italic">Driver signature: _________________________</p>
           </div>
         ))}
-        <p className="text-xs text-gray-500 mt-6 border-t pt-2">Driver signature: _________________________ Date: __________</p>
+        <div className="mt-4 pt-2 border-t border-gray-300 flex justify-between text-xs">
+          <span>Grand Total: <strong>${manifestOrders.reduce((s, o) => s + Number(o.total), 0).toFixed(2)}</strong></span>
+          <span>Stops delivered: {manifestOrders.filter(o => o.status === 'delivered').length} / {manifestOrders.length}</span>
+        </div>
       </div>
 
       {/* KPIs */}

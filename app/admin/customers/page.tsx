@@ -5,12 +5,13 @@ import { motion, AnimatePresence } from 'framer-motion'
 import {
   Search, Download, Mail, Phone, MapPin, ShoppingBag,
   RefreshCw, Users, DollarSign, CheckCircle2, Eye, Calendar,
-  MessageSquare, RefreshCcw, User, ArrowDownUp
+  MessageSquare, RefreshCcw, User, ArrowDownUp, Wallet, StickyNote
 } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { exportCSV } from '@/lib/csv'
@@ -24,6 +25,7 @@ type CustomerRow = {
   zone_id: string | null
   zoneName: string | null
   wallet_balance: number
+  customer_notes: string | null
   created_at: string
   // aggregated
   orderCount: number
@@ -67,6 +69,10 @@ export default function CustomersPage() {
   const [orders,     setOrders]     = useState<CustomerOrder[]>([])
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [toast,      setToast]      = useState('')
+  const [walletAmount, setWalletAmount] = useState('')
+  const [addingWallet, setAddingWallet] = useState(false)
+  const [customerNotes, setCustomerNotes] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
 
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
@@ -74,13 +80,18 @@ export default function CustomersPage() {
   const fetchCustomers = async () => {
     setLoading(true)
 
-    // Fetch all profiles
+    // Fetch all profiles (no FK join — zone_id is text, not a proper FK)
     const { data: profiles, error } = await supabase
       .from('profiles')
-      .select('id, name, email, phone, delivery_address, zone_id, wallet_balance, created_at, zones:zone_id(name)')
+      .select('id, name, email, phone, delivery_address, zone_id, wallet_balance, customer_notes, created_at')
       .order('created_at', { ascending: false })
 
-    if (error) { setLoading(false); return }
+    if (error) { console.error('profiles fetch error', error); setLoading(false); return }
+
+    // Build a zone name lookup
+    const { data: zones } = await supabase.from('zones').select('id, name')
+    const zoneMap: Record<string, string> = {}
+    for (const z of (zones ?? [])) { if (z.id) zoneMap[String(z.id)] = z.name }
 
     // Fetch all paid orders to aggregate per customer
     const { data: allOrders } = await supabase
@@ -120,7 +131,8 @@ export default function CustomersPage() {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     setCustomers((profiles ?? []).map((p: any) => ({
       ...p,
-      zoneName:           (Array.isArray(p.zones) ? p.zones[0]?.name : p.zones?.name) ?? null,
+      zoneName:           zoneMap[String(p.zone_id)] ?? null,
+      customer_notes:     p.customer_notes ?? null,
       orderCount:         agg[p.id]?.count ?? 0,
       lifetimeValue:      agg[p.id]?.total ?? 0,
       lastOrderDate:      agg[p.id]?.lastDate ?? null,
@@ -135,6 +147,8 @@ export default function CustomersPage() {
 
   const openCustomer = async (customer: CustomerRow) => {
     setSelected(customer)
+    setCustomerNotes(customer.customer_notes ?? '')
+    setWalletAmount('')
     setLoadingOrders(true)
     const { data } = await supabase
       .from('orders')
@@ -144,6 +158,40 @@ export default function CustomersPage() {
       .limit(20)
     setOrders((data ?? []) as CustomerOrder[])
     setLoadingOrders(false)
+  }
+
+  const handleWalletTopUp = async () => {
+    if (!selected) return
+    const amount = parseFloat(walletAmount)
+    if (isNaN(amount) || amount <= 0) return
+    setAddingWallet(true)
+    const newBalance = (selected.wallet_balance ?? 0) + amount
+    const { error } = await supabase
+      .from('profiles')
+      .update({ wallet_balance: newBalance })
+      .eq('id', selected.id)
+    if (!error) {
+      setSelected({ ...selected, wallet_balance: newBalance })
+      setCustomers(prev => prev.map(c => c.id === selected.id ? { ...c, wallet_balance: newBalance } : c))
+      setWalletAmount('')
+      showToast(`Wallet topped up by $${amount.toFixed(2)}`)
+    }
+    setAddingWallet(false)
+  }
+
+  const handleSaveNotes = async () => {
+    if (!selected) return
+    setSavingNotes(true)
+    const { error } = await supabase
+      .from('profiles')
+      .update({ customer_notes: customerNotes })
+      .eq('id', selected.id)
+    if (!error) {
+      setSelected({ ...selected, customer_notes: customerNotes })
+      setCustomers(prev => prev.map(c => c.id === selected.id ? { ...c, customer_notes: customerNotes } : c))
+      showToast('Notes saved')
+    }
+    setSavingNotes(false)
   }
 
   const filtered = customers
@@ -385,6 +433,58 @@ export default function CustomersPage() {
                       <Mail className="w-3.5 h-3.5" /> Contact customer
                     </a>
                   )}
+                </div>
+
+                {/* Wallet Top-Up */}
+                <div className="bg-amber-50 border border-amber-200 rounded-2xl p-4">
+                  <p className="text-xs font-semibold text-amber-800 uppercase tracking-wider mb-3 flex items-center gap-1.5">
+                    <Wallet className="w-3.5 h-3.5" /> Wallet Management
+                  </p>
+                  <div className="flex items-center gap-2 mb-1">
+                    <span className="text-sm text-amber-800">Current balance:</span>
+                    <span className="font-extrabold text-amber-900">${(selected.wallet_balance ?? 0).toFixed(2)}</span>
+                  </div>
+                  <div className="flex gap-2 mt-2">
+                    <Input
+                      type="number"
+                      min="0"
+                      step="0.01"
+                      placeholder="Amount to add ($)"
+                      value={walletAmount}
+                      onChange={e => setWalletAmount(e.target.value)}
+                      className="border-amber-300 bg-white text-sm h-8"
+                    />
+                    <Button
+                      size="sm"
+                      onClick={handleWalletTopUp}
+                      disabled={addingWallet || !walletAmount || parseFloat(walletAmount) <= 0}
+                      className="bg-amber-500 hover:bg-amber-600 text-white h-8 shrink-0"
+                    >
+                      {addingWallet ? '...' : 'Top Up'}
+                    </Button>
+                  </div>
+                </div>
+
+                {/* Admin Notes */}
+                <div>
+                  <p className="text-xs font-semibold text-[#4a7fa5] uppercase tracking-wider mb-2 flex items-center gap-1.5">
+                    <StickyNote className="w-3.5 h-3.5" /> Admin Notes
+                  </p>
+                  <Textarea
+                    placeholder="Private notes about this customer (not visible to customer)..."
+                    value={customerNotes}
+                    onChange={e => setCustomerNotes(e.target.value)}
+                    rows={3}
+                    className="border-[#cce7f0] text-sm resize-none"
+                  />
+                  <Button
+                    size="sm"
+                    onClick={handleSaveNotes}
+                    disabled={savingNotes}
+                    className="mt-2 bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white"
+                  >
+                    {savingNotes ? 'Saving...' : 'Save Notes'}
+                  </Button>
                 </div>
 
                 {/* Order history */}

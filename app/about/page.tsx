@@ -28,7 +28,7 @@ const values = [
   { icon: Heart, title: 'Customer Love', desc: '4.9 stars from over 800 verified reviews across Google and Facebook.' },
 ]
 
-interface TeamMember { id: string; name: string; role: string; bio: string; initials: string; color: string; sort_order: number }
+interface TeamMember { id: string; name: string; role: string; bio: string; initials: string; color: string; image_url?: string | null; sort_order: number }
 interface SiteContent { key: string; value: string }
 
 export default function AboutPage() {
@@ -173,12 +173,21 @@ export default function AboutPage() {
                 transition={{ delay: i * 0.1 }}
                 className="water-card bg-white rounded-3xl p-6 text-center border border-[#cce7f0]"
               >
-                <div
-                  className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-xl mx-auto mb-4 shadow-lg"
-                  style={{ background: `linear-gradient(135deg, ${member.color}, ${member.color}99)` }}
-                >
-                  {member.initials}
-                </div>
+                {member.image_url ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={member.image_url}
+                    alt={member.name}
+                    className="w-20 h-20 rounded-2xl object-cover mx-auto mb-4 shadow-lg"
+                  />
+                ) : (
+                  <div
+                    className="w-20 h-20 rounded-2xl flex items-center justify-center text-white font-bold text-xl mx-auto mb-4 shadow-lg"
+                    style={{ background: `linear-gradient(135deg, ${member.color}, ${member.color}99)` }}
+                  >
+                    {member.initials}
+                  </div>
+                )}
                 <h3 className="font-bold text-[#0c2340]">{member.name}</h3>
                 <p className="text-xs font-medium mb-3" style={{ color: member.color }}>{member.role}</p>
                 <p className="text-[#4a7fa5] text-xs leading-relaxed">{member.bio}</p>

@@ -11,6 +11,8 @@ import { supabase } from '@/lib/supabase'
 export default function ContactPage() {
   const [form, setForm] = useState({ name: '', email: '', phone: '', subject: '', message: '' })
   const [sent, setSent] = useState(false)
+  const [sending, setSending] = useState(false)
+  const [sendError, setSendError] = useState('')
   const [phone,   setPhone]   = useState(process.env.NEXT_PUBLIC_COMPANY_PHONE   ?? '')
   const [email,   setEmail]   = useState(process.env.NEXT_PUBLIC_COMPANY_EMAIL   ?? '')
   const [address, setAddress] = useState('Metro Vancouver, BC, Canada')
@@ -30,9 +32,23 @@ export default function ContactPage() {
       })
   }, [])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    setSent(true)
+    setSending(true)
+    setSendError('')
+    try {
+      const res = await fetch('/api/contact', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      if (!res.ok) throw new Error('Failed to send')
+      setSent(true)
+    } catch {
+      setSendError('Something went wrong. Please try calling or emailing us directly.')
+    } finally {
+      setSending(false)
+    }
   }
 
   return (
@@ -194,8 +210,15 @@ export default function ContactPage() {
                         onChange={(e) => setForm({ ...form, message: e.target.value })}
                       />
                     </div>
-                    <Button type="submit" className="w-full h-12 rounded-xl bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white font-semibold gap-2">
-                      <Send className="w-4 h-4" /> Send Message
+                    {sendError && (
+                      <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">{sendError}</p>
+                    )}
+                    <Button type="submit" disabled={sending} className="w-full h-12 rounded-xl bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white font-semibold gap-2">
+                      {sending ? (
+                        <><span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" /> Sending...</>
+                      ) : (
+                        <><Send className="w-4 h-4" /> Send Message</>
+                      )}
                     </Button>
                   </form>
                 )}

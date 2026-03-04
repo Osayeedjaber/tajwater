@@ -35,6 +35,7 @@ interface Service {
   pricing: { label: string; price: string }[]
   icon: string
   color: string
+  image_url?: string | null
   sort_order: number
 }
 
@@ -138,8 +139,16 @@ export default function ServicesPage() {
                     </div>
                   </div>
 
-                  {/* Pricing card */}
+                  {/* Image or Pricing card */}
                   <div className={i % 2 === 1 ? 'lg:order-1' : ''}>
+                    {svc.image_url && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img
+                        src={svc.image_url}
+                        alt={svc.title}
+                        className="w-full h-52 object-cover rounded-3xl shadow-lg mb-4"
+                      />
+                    )}
                     <div className="bg-white rounded-3xl border border-[#cce7f0] shadow-lg overflow-hidden">
                       <div className="p-5 border-b border-[#cce7f0]" style={{ background: bg }}>
                         <h3 className="font-bold text-[#0c2340]">Pricing</h3>

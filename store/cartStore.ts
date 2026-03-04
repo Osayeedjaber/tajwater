@@ -11,6 +11,8 @@ interface CartStore {
   clearCart: () => void
   total: () => number
   count: () => number
+  _hasHydrated: boolean
+  setHasHydrated: (v: boolean) => void
 }
 
 export const useCart = create<CartStore>()(
@@ -56,7 +58,15 @@ export const useCart = create<CartStore>()(
       total: () => get().items.reduce((sum, i) => sum + i.product.price * i.quantity, 0),
 
       count: () => get().items.reduce((sum, i) => sum + i.quantity, 0),
+
+      _hasHydrated: false,
+      setHasHydrated: (v) => set({ _hasHydrated: v }),
     }),
-    { name: 'tajwater-cart' }
+    {
+      name: 'tajwater-cart',
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true)
+      },
+    }
   )
 )

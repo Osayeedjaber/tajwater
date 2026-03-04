@@ -10,6 +10,7 @@ import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog'
+import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { exportCSV } from '@/lib/csv'
 import Image from 'next/image'
@@ -65,6 +66,8 @@ export default function AdminOrdersPage() {
   const [toast,    setToast]    = useState('')
   const [driverDialog, setDriverDialog] = useState<{ orderId: string; current: string } | null>(null)
   const [driverInput, setDriverInput] = useState('')
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set())
+  const [bulkUpdating, setBulkUpdating] = useState(false)
 
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
@@ -174,6 +177,50 @@ export default function AdminOrdersPage() {
     setDriverDialog({ orderId, current: current ?? '' })
   }
 
+  const toggleSelect = (id: string) => {
+    setSelectedIds(prev => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id); else next.add(id)
+      return next
+    })
+  }
+
+  const toggleSelectAll = () => {
+    if (selectedIds.size === filtered.length) {
+      setSelectedIds(new Set())
+    } else {
+      setSelectedIds(new Set(filtered.map(o => o.id)))
+    }
+  }
+
+  const bulkAdvance = async () => {
+    setBulkUpdating(true)
+    const toAdvance = filtered.filter(o => selectedIds.has(o.id) && STATUS_STYLE[o.status]?.next)
+    for (const order of toAdvance) {
+      const next = STATUS_STYLE[order.status].next!
+      await supabase.from('orders').update({ status: next }).eq('id', order.id)
+      setOrders(prev => prev.map(o => o.id === order.id ? { ...o, status: next } : o))
+    }
+    setBulkUpdating(false)
+    setSelectedIds(new Set())
+    showToast(`${toAdvance.length} order(s) advanced`)
+  }
+
+  const bulkExport = () => {
+    const rows = filtered.filter(o => selectedIds.has(o.id))
+    exportCSV('selected-orders.csv', rows.map(o => ({
+      id: shortId(o.id),
+      customer: o.profile?.name ?? o.customer_name ?? 'Guest',
+      zone: (Array.isArray(o.zones) ? o.zones[0]?.name : o.zones?.name) ?? '—',
+      status: o.status,
+      payment_status: o.payment_status ?? '—',
+      total: o.total.toFixed(2),
+      driver: o.driver_name ?? '—',
+      date: fmtDate(o.created_at),
+    })))
+    setSelectedIds(new Set())
+  }
+
   const filtered = orders
     .filter(o => filter === 'all' || o.status === filter)
     .filter(o => {
@@ -263,6 +310,32 @@ export default function AdminOrdersPage() {
         </div>
       </div>
 
+      {/* Bulk Actions Bar */}
+      <AnimatePresence>
+        {selectedIds.size > 0 && (
+          <motion.div
+            initial={{ opacity: 0, y: -12 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: -12 }}
+            className="flex items-center gap-3 bg-[#0c2340] text-white px-5 py-3 rounded-2xl shadow-lg"
+          >
+            <span className="text-sm font-semibold">{selectedIds.size} selected</span>
+            <div className="flex-1" />
+            <Button size="sm" onClick={bulkAdvance} disabled={bulkUpdating}
+              className="bg-[#0097a7] hover:bg-[#00bcd4] text-white h-7 text-xs gap-1">
+              <Truck className="w-3.5 h-3.5" /> Advance Status
+            </Button>
+            <Button size="sm" onClick={bulkExport}
+              className="bg-white/20 hover:bg-white/30 text-white h-7 text-xs gap-1">
+              <Download className="w-3.5 h-3.5" /> Export Selected
+            </Button>
+            <button onClick={() => setSelectedIds(new Set())} className="text-white/60 hover:text-white text-xs ml-2">
+              Clear
+            </button>
+          </motion.div>
+        )}
+      </AnimatePresence>
+
       {/* Table */}
       {loading ? (
         <div className="space-y-2">
@@ -282,6 +355,14 @@ export default function AdminOrdersPage() {
             <table className="w-full text-sm">
               <thead className="bg-[#f0f9ff] border-b border-[#cce7f0]">
                 <tr>
+                  <th className="px-4 py-3 text-left w-10">
+                    <input
+                      type="checkbox"
+                      checked={selectedIds.size === filtered.length && filtered.length > 0}
+                      onChange={toggleSelectAll}
+                      className="rounded border-[#cce7f0] accent-[#0097a7] cursor-pointer"
+                    />
+                  </th>
                   {[
                     { label: 'Order ID',  cls: '' },
                     { label: 'Customer',  cls: '' },
@@ -309,8 +390,16 @@ export default function AdminOrdersPage() {
                       initial={{ opacity: 0 }}
                       animate={{ opacity: 1 }}
                       transition={{ delay: i * 0.02 }}
-                      className="hover:bg-[#f0f9ff] transition-colors"
+                      className={`hover:bg-[#f0f9ff] transition-colors ${selectedIds.has(order.id) ? 'bg-[#e0f7fa]/40' : ''}`}
                     >
+                      <td className="px-4 py-3 w-10">
+                        <input
+                          type="checkbox"
+                          checked={selectedIds.has(order.id)}
+                          onChange={() => toggleSelect(order.id)}
+                          className="rounded border-[#cce7f0] accent-[#0097a7] cursor-pointer"
+                        />
+                      </td>
                       <td className="px-4 py-3 font-mono text-xs font-bold text-[#0097a7]">{shortId(order.id)}</td>
                       <td className="px-4 py-3">
                         <p className="font-medium text-[#0c2340] max-w-[100px] truncate">{order.profile?.name ?? order.customer_name ?? 'Guest'}</p>
@@ -360,14 +449,15 @@ export default function AdminOrdersPage() {
                               <Truck className="w-3 h-3" /> {s.nextLabel}
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="outline"
-                            onClick={() => setSelected(order)}
-                            className="h-7 text-[10px] border-[#cce7f0] text-[#4a7fa5] px-2"
-                          >
-                            <Eye className="w-3 h-3" />
-                          </Button>
+                          <Link href={`/admin/orders/${order.id}`}>
+                            <Button
+                              size="sm"
+                              variant="outline"
+                              className="h-7 text-[10px] border-[#cce7f0] text-[#4a7fa5] px-2"
+                            >
+                              <Eye className="w-3 h-3" />
+                            </Button>
+                          </Link>
                           <a
                             href={`/api/invoice/${order.id}`}
                             target="_blank"

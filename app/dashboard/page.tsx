@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import Link from 'next/link'
-import { ShoppingBag, RefreshCw, Droplets, ArrowRight, Truck, Package, CheckCircle2, Wallet, XCircle, Clock } from 'lucide-react'
+import { ShoppingBag, RefreshCw, Droplets, ArrowRight, Truck, Package, CheckCircle2, Wallet, XCircle, Clock, DollarSign, Bell } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { supabase } from '@/lib/supabase'
@@ -12,6 +12,7 @@ type OrderItem = { quantity: number; product: { name: string } | null }
 type Order = {
   id: string
   status: string
+  payment_status: string | null
   total: number
   delivery_address: string | null
   created_at: string
@@ -46,9 +47,12 @@ export default function DashboardPage() {
   const [walletBalance, setWalletBalance] = useState<number>(0)
   const [orderCount, setOrderCount] = useState(0)
   const [jugsOrdered, setJugsOrdered] = useState(0)
+  const [totalSpent, setTotalSpent] = useState(0)
   const [recentOrders, setRecentOrders] = useState<Order[]>([])
+  const [latestActiveOrder, setLatestActiveOrder] = useState<Order | null>(null)
   const [subscription, setSubscription] = useState<Subscription | null>(null)
   const [loading, setLoading] = useState(true)
+  const [statusDismissed, setStatusDismissed] = useState(false)
 
   useEffect(() => {
     const load = async () => {
@@ -64,25 +68,36 @@ export default function DashboardPage() {
         .from('profiles')
         .select('wallet_balance')
         .eq('id', userId)
-        .single()
+        .maybeSingle()
 
       const walletBal = profile?.wallet_balance ?? 0
-      if (profile) setWalletBalance(walletBal)
+      setWalletBalance(walletBal)
 
       // Load orders with items for stats + recent
       const { data: orders } = await supabase
         .from('orders')
-        .select('id, status, total, delivery_address, created_at, order_items(quantity, product:products(name))')
+        .select('id, status, payment_status, total, delivery_address, created_at, order_items(quantity, product:products(name))')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
 
       if (orders) {
         setOrderCount(orders.length)
-        const totalJugs = orders.reduce((sum, o) => {
-          return sum + (o.order_items || []).reduce((s, item) => s + item.quantity, 0)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const totalJugs = (orders as any[]).reduce((sum: number, o: any) => {
+          return sum + (Array.isArray(o.order_items) ? o.order_items : []).reduce((s: number, item: any) => s + (item.quantity ?? 0), 0)
         }, 0)
         setJugsOrdered(totalJugs)
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const spent = (orders as unknown as any[])
+          .filter((o) => o.payment_status === 'paid')
+          .reduce((s: number, o: { total: number }) => s + Number(o.total ?? 0), 0)
+        setTotalSpent(spent)
         setRecentOrders(orders.slice(0, 3) as unknown as Order[])
+        // Latest non-delivered, non-cancelled order for status alert
+        const activeStatuses = ['pending', 'processing', 'out_for_delivery']
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const activeOrder = (orders as unknown as any[]).find((o: { status: string }) => activeStatuses.includes(o.status))
+        if (activeOrder) setLatestActiveOrder(activeOrder as Order)
       }
 
       // Load subscription
@@ -162,11 +177,12 @@ export default function DashboardPage() {
       </motion.div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { icon: Package, label: 'Total Orders', value: String(orderCount), color: '#0097a7', bg: '#e0f7fa' },
-          { icon: Droplets, label: 'Jugs Ordered', value: String(jugsOrdered), color: '#1565c0', bg: '#e3f2fd' },
-          { icon: Wallet, label: 'Wallet Balance', value: `$${walletBalance.toFixed(2)}`, color: '#006064', bg: '#e0f2f1' },
+          { icon: Package,    label: 'Total Orders',   value: String(orderCount),           color: '#0097a7', bg: '#e0f7fa' },
+          { icon: Droplets,   label: 'Jugs Ordered',   value: String(jugsOrdered),          color: '#1565c0', bg: '#e3f2fd' },
+          { icon: DollarSign, label: 'Total Spent',     value: `$${totalSpent.toFixed(2)}`,  color: '#006064', bg: '#e0f2f1' },
+          { icon: Wallet,     label: 'Wallet Balance',  value: `$${walletBalance.toFixed(2)}`, color: '#f59e0b', bg: '#fef3c7' },
         ].map((stat, i) => {
           const Icon = stat.icon
           return (
@@ -186,6 +202,68 @@ export default function DashboardPage() {
           )
         })}
       </div>
+
+      {/* Active Order Status Alert */}
+      <AnimatePresence>
+        {latestActiveOrder && !statusDismissed && (() => {
+          const statusKey = latestActiveOrder.status as keyof typeof statusConfig
+          const s = statusConfig[statusKey] || statusConfig.pending
+          const StatusIcon = s.icon
+          const steps = [
+            { key: 'pending',          label: 'Order Placed' },
+            { key: 'processing',       label: 'Processing' },
+            { key: 'out_for_delivery', label: 'Out for Delivery' },
+            { key: 'delivered',        label: 'Delivered' },
+          ]
+          const currentStep = steps.findIndex(st => st.key === latestActiveOrder.status)
+          return (
+            <motion.div
+              initial={{ opacity: 0, y: -10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              className="bg-white border border-[#cce7f0] rounded-2xl p-4 shadow-sm"
+            >
+              <div className="flex items-center justify-between mb-3">
+                <div className="flex items-center gap-2">
+                  <Bell className="w-4 h-4 text-[#0097a7]" />
+                  <span className="text-sm font-bold text-[#0c2340]">Active Order #{latestActiveOrder.id.slice(0, 8).toUpperCase()}</span>
+                  <span className={`inline-flex items-center gap-1 text-[10px] px-2 py-0.5 rounded-full font-medium ${s.color}`}>
+                    <StatusIcon className="w-2.5 h-2.5" /> {s.label}
+                  </span>
+                </div>
+                <button onClick={() => setStatusDismissed(true)} className="text-[#4a7fa5] hover:text-[#0c2340] text-xs">✕</button>
+              </div>
+              {/* Step tracker */}
+              <div className="flex items-center gap-0">
+                {steps.map((step, idx) => {
+                  const done    = idx < currentStep
+                  const active  = idx === currentStep
+                  const last    = idx === steps.length - 1
+                  return (
+                    <div key={step.key} className="flex items-center flex-1 min-w-0">
+                      <div className="flex flex-col items-center shrink-0">
+                        <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold transition-all
+                          ${done   ? 'bg-[#0097a7] text-white' :
+                            active ? 'bg-[#1565c0] text-white ring-2 ring-[#1565c0]/30 ring-offset-1' :
+                            'bg-[#f0f9ff] text-[#4a7fa5] border border-[#cce7f0]'}`}>
+                          {done ? <CheckCircle2 className="w-3.5 h-3.5" /> : idx + 1}
+                        </div>
+                        <span className={`text-[9px] mt-1 font-medium text-center leading-tight max-w-[60px]
+                          ${active ? 'text-[#1565c0]' : done ? 'text-[#0097a7]' : 'text-[#4a7fa5]'}`}>
+                          {step.label}
+                        </span>
+                      </div>
+                      {!last && (
+                        <div className={`flex-1 h-0.5 mx-1 mt-[-14px] ${idx < currentStep ? 'bg-[#0097a7]' : 'bg-[#e0f7fa]'}`} />
+                      )}
+                    </div>
+                  )
+                })}
+              </div>
+            </motion.div>
+          )
+        })()}
+      </AnimatePresence>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Recent Orders */}
