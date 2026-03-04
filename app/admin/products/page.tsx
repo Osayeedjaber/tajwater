@@ -48,6 +48,7 @@ export default function AdminProductsPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchProducts() }, [])
 
   const adjustStock = async (product: Product, delta: number) => {

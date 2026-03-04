@@ -103,6 +103,7 @@ export default function AdminOrdersPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchOrders() }, [])
 
   const advanceStatus = async (order: OrderRow) => {

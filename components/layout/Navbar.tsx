@@ -44,6 +44,7 @@ export default function Navbar() {
   }, [])
 
   // Close mobile menu on route change
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { setMobileOpen(false) }, [pathname])
 
   if (pathname.startsWith('/admin') || pathname.startsWith('/auth')) return null

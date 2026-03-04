@@ -52,6 +52,7 @@ export async function POST(request: NextRequest) {
     if (!order) return NextResponse.json({ error: 'Order not found' }, { status: 404 })
 
     const customerName = (order as { customer_name?: string }).customer_name ?? 'Customer'
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const customerEmail = (order as unknown as { profiles?: { email: string } | null })
     // Fallback: fetch profile email via order directly
     const { data: fullOrder } = await db

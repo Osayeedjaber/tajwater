@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Plus, Edit, Trash2, CheckCircle2, Droplets, Settings, Building2, RefreshCw, Clock, Shield } from 'lucide-react'
+import { Plus, CheckCircle2, Droplets, Settings, Building2, RefreshCw, Clock, Shield } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
@@ -58,6 +58,7 @@ export default function AdminServicesPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetch() }, [])
 
   const openAdd = () => {

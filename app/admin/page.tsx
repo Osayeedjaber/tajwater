@@ -104,6 +104,7 @@ export default function AdminDashboard() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchData() }, [])
 
   const kpis = [
@@ -226,7 +227,7 @@ export default function AdminDashboard() {
         ) : recentOrders.length === 0 ? (
           <div className="p-12 text-center">
             <Package className="w-8 h-8 text-[#cce7f0] mx-auto mb-2" />
-            <p className="text-sm text-[#4a7fa5]">No orders yet — they'll appear here once customers start ordering</p>
+            <p className="text-sm text-[#4a7fa5]">No orders yet — they&apos;ll appear here once customers start ordering</p>
           </div>
         ) : (
           <div className="overflow-x-auto">

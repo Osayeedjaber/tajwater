@@ -45,6 +45,89 @@ const ROLE_COLOR: Record<string, string> = {
 
 type Notif = { id: string; text: string; href: string; time: string; read: boolean }
 
+type NavItem = { icon: React.ElementType; label: string; href: string; roles: string[] }
+
+// Extracted Sidebar component to avoid "cannot create components during render" error
+function AdminSidebar({
+  navItems,
+  pathname,
+  role,
+  adminName,
+  setSidebarOpen,
+  handleLogout,
+}: {
+  navItems: NavItem[]
+  pathname: string
+  role: Role
+  adminName: string
+  setSidebarOpen: (v: boolean) => void
+  handleLogout: () => void
+}) {
+  return (
+    <div className="flex flex-col h-full bg-gradient-to-b from-[#003d40] to-[#0d47a1]">
+      {/* Logo */}
+      <div className="p-5 border-b border-white/10">
+        <Link href="/" onClick={() => setSidebarOpen(false)}>
+          <Image src="/logo/tajwhite.svg" alt="TajWater" width={120} height={40} className="h-8 w-auto" />
+        </Link>
+        <p className="text-[10px] text-[#b3e5fc]/60 mt-1.5 font-medium tracking-wider uppercase">Admin Panel</p>
+      </div>
+
+      {/* Role + name */}
+      {role && (
+        <div className="px-5 pt-4 pb-2">
+          <span className={`inline-block text-[10px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLOR[role] ?? 'bg-white/10 text-[#b3e5fc]'}`}>
+            {ROLE_LABEL[role] ?? role}
+          </span>
+          <p className="text-xs text-white/60 mt-1.5 truncate">{adminName}</p>
+        </div>
+      )}
+
+      {/* Nav */}
+      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
+        {navItems.map(item => {
+          const Icon   = item.icon
+          const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))
+          return (
+            <Link
+              key={item.href}
+              href={item.href}
+              onClick={() => setSidebarOpen(false)}
+              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
+                active
+                  ? 'bg-white/20 text-white shadow-sm'
+                  : 'text-[#b3e5fc]/80 hover:bg-white/10 hover:text-white'
+              }`}
+            >
+              <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-[#b3e5fc]/60'}`} />
+              {item.label}
+              {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00bcd4]" />}
+            </Link>
+          )
+        })}
+      </nav>
+
+      {/* Bottom actions */}
+      <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
+        <Link
+          href="/"
+          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#b3e5fc]/70 hover:bg-white/10 hover:text-white transition-all"
+        >
+          <X className="w-4 h-4" />
+          Exit to Site
+        </Link>
+        <button
+          onClick={handleLogout}
+          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#b3e5fc]/70 hover:bg-red-500/20 hover:text-red-300 transition-all"
+        >
+          <LogOut className="w-4 h-4" />
+          Sign Out
+        </button>
+      </div>
+    </div>
+  )
+}
+
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
   const pathname   = usePathname()
   const router     = useRouter()
@@ -60,6 +143,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
   useEffect(() => {
     // Skip auth check on the login page itself
     if (pathname === '/admin/login') {
+      // eslint-disable-next-line react-hooks/set-state-in-effect
       setMounted(true)
       return
     }
@@ -73,8 +157,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
       return
     }
 
+     
     setRole(storedRole)
+     
     setAdminName(storedName)
+     
     setMounted(true)
   }, [pathname, router])
 
@@ -149,75 +236,11 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     router.push('/admin/login')
   }
 
-  const Sidebar = () => (
-    <div className="flex flex-col h-full bg-gradient-to-b from-[#003d40] to-[#0d47a1]">
-      {/* Logo */}
-      <div className="p-5 border-b border-white/10">
-        <Link href="/" onClick={() => setSidebarOpen(false)}>
-          <Image src="/logo/tajwhite.svg" alt="TajWater" width={120} height={40} className="h-8 w-auto" />
-        </Link>
-        <p className="text-[10px] text-[#b3e5fc]/60 mt-1.5 font-medium tracking-wider uppercase">Admin Panel</p>
-      </div>
-
-      {/* Role + name */}
-      {role && (
-        <div className="px-5 pt-4 pb-2">
-          <span className={`inline-block text-[10px] font-semibold px-2.5 py-1 rounded-full ${ROLE_COLOR[role] ?? 'bg-white/10 text-[#b3e5fc]'}`}>
-            {ROLE_LABEL[role] ?? role}
-          </span>
-          <p className="text-xs text-white/60 mt-1.5 truncate">{adminName}</p>
-        </div>
-      )}
-
-      {/* Nav */}
-      <nav className="flex-1 px-3 py-2 space-y-0.5 overflow-y-auto">
-        {navItems.map(item => {
-          const Icon   = item.icon
-          const active = pathname === item.href || (item.href !== '/admin' && pathname.startsWith(item.href))
-          return (
-            <Link
-              key={item.href}
-              href={item.href}
-              onClick={() => setSidebarOpen(false)}
-              className={`flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium transition-all ${
-                active
-                  ? 'bg-white/20 text-white shadow-sm'
-                  : 'text-[#b3e5fc]/80 hover:bg-white/10 hover:text-white'
-              }`}
-            >
-              <Icon className={`w-4 h-4 shrink-0 ${active ? 'text-white' : 'text-[#b3e5fc]/60'}`} />
-              {item.label}
-              {active && <div className="ml-auto w-1.5 h-1.5 rounded-full bg-[#00bcd4]" />}
-            </Link>
-          )
-        })}
-      </nav>
-
-      {/* Bottom actions */}
-      <div className="px-3 py-4 border-t border-white/10 space-y-0.5">
-        <Link
-          href="/"
-          className="flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#b3e5fc]/70 hover:bg-white/10 hover:text-white transition-all"
-        >
-          <X className="w-4 h-4" />
-          Exit to Site
-        </Link>
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-sm font-medium text-[#b3e5fc]/70 hover:bg-red-500/20 hover:text-red-300 transition-all"
-        >
-          <LogOut className="w-4 h-4" />
-          Sign Out
-        </button>
-      </div>
-    </div>
-  )
-
   return (
     <div className="min-h-screen bg-[#f0f9ff] flex">
       {/* Desktop sidebar */}
       <aside className="hidden lg:flex w-56 flex-col fixed top-0 bottom-0 left-0 z-30 shadow-xl">
-        <Sidebar />
+        <AdminSidebar navItems={navItems} pathname={pathname} role={role} adminName={adminName} setSidebarOpen={setSidebarOpen} handleLogout={handleLogout} />
       </aside>
 
       {/* Mobile sidebar overlay */}
@@ -238,7 +261,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
               transition={{ type: 'spring', damping: 28, stiffness: 260 }}
               className="fixed top-0 left-0 bottom-0 w-56 z-50 shadow-2xl lg:hidden"
             >
-              <Sidebar />
+              <AdminSidebar navItems={navItems} pathname={pathname} role={role} adminName={adminName} setSidebarOpen={setSidebarOpen} handleLogout={handleLogout} />
             </motion.aside>
           </>
         )}

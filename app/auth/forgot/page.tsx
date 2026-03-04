@@ -50,7 +50,7 @@ export default function ForgotPasswordPage() {
               <Image src="/logo/tajcyan.svg" alt="TajWater" width={160} height={52} className="h-12 w-auto" />
             </div>
             <h1 className="text-2xl font-extrabold text-[#0c2340]">Reset Your Password</h1>
-            <p className="text-[#4a7fa5] text-sm mt-1">Enter your email and we'll send you a reset link</p>
+            <p className="text-[#4a7fa5] text-sm mt-1">Enter your email and we&apos;ll send you a reset link</p>
           </div>
 
           {sent ? (

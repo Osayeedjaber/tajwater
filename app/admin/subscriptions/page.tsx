@@ -42,6 +42,7 @@ export default function AdminSubscriptionsPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchSubs() }, [])
 
   const updateStatus = async (id: string, newStatus: string) => {

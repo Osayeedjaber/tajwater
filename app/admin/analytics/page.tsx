@@ -114,6 +114,7 @@ export default function AnalyticsPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect, react-hooks/exhaustive-deps
   useEffect(() => { fetchData() }, [range])
 
   // ── Filtered orders by selected range ──────────────────────────────────

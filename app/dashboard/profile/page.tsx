@@ -179,6 +179,7 @@ export default function ProfilePage() {
                   title="Change profile photo"
                 >
                   {avatarUrl ? (
+                    // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={avatarUrl}
                       alt="Profile"

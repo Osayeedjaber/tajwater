@@ -31,6 +31,7 @@ const aboutFields = [
 export default function AdminContentPage() {
   const [team, setTeam] = useState<TeamMember[]>([])
   const [services, setServices] = useState<Service[]>([])
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const [siteContent, setSiteContent] = useState<SiteContent[]>([])
   const [loading, setLoading] = useState(true)
   const [toast, setToast] = useState('')
@@ -73,6 +74,7 @@ export default function AdminContentPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchAll() }, [])
 
   // ─── Site content helpers ─────────────────────────────

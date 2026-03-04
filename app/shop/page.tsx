@@ -28,7 +28,7 @@ export default function ShopPage() {
   const [addedId, setAddedId] = useState<string | null>(null)
   const [subscribeMode, setSubscribeMode] = useState<Record<string, boolean>>({})
   const [subFreq, setSubFreq] = useState<Record<string, 'weekly' | 'biweekly' | 'monthly'>>({})
-  const { items, addItem, updateQuantity, updateSubscribeFrequency, count } = useCart()
+  const { items, addItem, updateQuantity, count } = useCart()
 
   useEffect(() => {
     const fetchProducts = async () => {

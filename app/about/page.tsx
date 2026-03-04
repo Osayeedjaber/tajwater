@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Shield, Award, Leaf, Heart, Users, Droplets, CheckCircle2 } from 'lucide-react'
+import { Shield, Award, Leaf, Heart, Users, Droplets } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 
 const timeline = [

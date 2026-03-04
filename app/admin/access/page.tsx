@@ -66,6 +66,7 @@ export default function AdminAccessPage() {
   }
 
   useEffect(() => {
+    // eslint-disable-next-line react-hooks/set-state-in-effect
     fetchAdmins()
     supabase.auth.getUser().then(({ data }) => {
       setCurrentEmail(data.user?.email ?? '')

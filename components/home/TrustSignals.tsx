@@ -38,20 +38,32 @@ const stats = [
   { icon: Shield, value: 100, suffix: '%', label: 'Quality Certified', color: '#1565c0' },
 ]
 
+// Precomputed bubble styles to avoid Math.random during render
+const bubbleStyles = [
+  { width: 85, height: 75, left: 12, top: 8 },
+  { width: 55, height: 60, left: 78, top: 15 },
+  { width: 100, height: 95, left: 35, top: 65 },
+  { width: 45, height: 50, left: 92, top: 45 },
+  { width: 70, height: 80, left: 5, top: 80 },
+  { width: 65, height: 55, left: 55, top: 25 },
+  { width: 90, height: 85, left: 25, top: 50 },
+  { width: 40, height: 45, left: 68, top: 75 },
+]
+
 export default function TrustSignals() {
   return (
     <section className="py-20 bg-gradient-to-br from-[#006064] to-[#1565c0] relative overflow-hidden">
       {/* Background bubbles */}
       <div className="absolute inset-0 pointer-events-none">
-        {[...Array(8)].map((_, i) => (
+        {bubbleStyles.map((bubble, i) => (
           <div
             key={i}
             className="absolute rounded-full border border-white/10 animate-float-bubble"
             style={{
-              width: `${Math.random() * 80 + 30}px`,
-              height: `${Math.random() * 80 + 30}px`,
-              left: `${Math.random() * 100}%`,
-              top: `${Math.random() * 100}%`,
+              width: `${bubble.width}px`,
+              height: `${bubble.height}px`,
+              left: `${bubble.left}%`,
+              top: `${bubble.top}%`,
               animationDelay: `${i * 0.7}s`,
               animationDuration: `${4 + i}s`,
             }}

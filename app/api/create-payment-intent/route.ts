@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { amount, items, address, userId, notes, discountCodeId, discountAmount: clientDiscountAmount } = await req.json()
     type CartItem = { product_id: string; quantity: number; subscribeFrequency?: 'weekly' | 'biweekly' | 'monthly' }
 

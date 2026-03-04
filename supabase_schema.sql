@@ -16,8 +16,14 @@ create table if not exists public.profiles (
   zone_id text,
   avatar_url text,
   wallet_balance numeric default 0,
-  created_at timestamptz default now()
+  customer_notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
+
+-- Migration: add columns if table already exists (idempotent)
+alter table public.profiles add column if not exists customer_notes text;
+alter table public.profiles add column if not exists updated_at timestamptz default now();
 
 -- Delivery zones
 create table if not exists public.zones (
@@ -37,8 +43,14 @@ create table if not exists public.products (
   image_url text,
   stock integer default 0,
   category text,
-  active boolean default true
+  active boolean default true,
+  low_stock_threshold integer default 10,
+  updated_at timestamptz default now()
 );
+
+-- Migration: add columns if table already exists (idempotent)
+alter table public.products add column if not exists low_stock_threshold integer default 10;
+alter table public.products add column if not exists updated_at timestamptz default now();
 
 -- Orders
 create table if not exists public.orders (
@@ -53,7 +65,11 @@ create table if not exists public.orders (
   customer_name text,
   customer_phone text,
   stripe_payment_intent_id text,
-  created_at timestamptz default now()
+  refund_amount numeric default 0,
+  tax_amount numeric default 0,
+  notes text,
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
 
 -- Migration: add columns if table already exists (idempotent)
@@ -61,6 +77,10 @@ alter table public.orders add column if not exists payment_status text default '
 alter table public.orders add column if not exists customer_name text;
 alter table public.orders add column if not exists customer_phone text;
 alter table public.orders add column if not exists stripe_payment_intent_id text;
+alter table public.orders add column if not exists refund_amount numeric default 0;
+alter table public.orders add column if not exists tax_amount numeric default 0;
+alter table public.orders add column if not exists notes text;
+alter table public.orders add column if not exists updated_at timestamptz default now();
 
 -- Order items
 create table if not exists public.order_items (
@@ -80,8 +100,14 @@ create table if not exists public.subscriptions (
   next_delivery date,
   status text default 'active',
   quantity integer default 1,
-  zone_id uuid references public.zones
+  zone_id uuid references public.zones,
+  price numeric,
+  created_at timestamptz default now()
 );
+
+-- Migration: add columns if table already exists (idempotent)
+alter table public.subscriptions add column if not exists price numeric;
+alter table public.subscriptions add column if not exists created_at timestamptz default now();
 
 -- Support tickets
 create table if not exists public.tickets (
@@ -93,8 +119,15 @@ create table if not exists public.tickets (
   admin_reply text,
   replied_at timestamptz,
   replied_by text,
-  created_at timestamptz default now()
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
 );
+
+-- Migration: add columns if table already exists (idempotent)
+alter table public.tickets add column if not exists admin_reply text;
+alter table public.tickets add column if not exists replied_at timestamptz;
+alter table public.tickets add column if not exists replied_by text;
+alter table public.tickets add column if not exists updated_at timestamptz default now();
 
 -- Admin users (separate role table — email must match a Supabase auth user)
 create table if not exists public.admin_users (
@@ -138,6 +171,68 @@ create table if not exists public.site_content (
   updated_at timestamptz default now()
 );
 
+-- Email logs (tracks all emails sent — system + admin)
+create table if not exists public.email_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete set null,
+  recipient_email text not null,
+  email_type text not null,
+  subject text not null,
+  status text not null default 'sent',
+  resend_id text,
+  error_message text,
+  sent_by text,
+  metadata jsonb,
+  sent_at timestamptz not null default now()
+);
+
+-- Newsletter subscribers
+create table if not exists public.newsletter_subscribers (
+  id uuid primary key default gen_random_uuid(),
+  email text unique not null,
+  subscribed_at timestamptz default now(),
+  source text default 'homepage',
+  active boolean default true,
+  notes text
+);
+
+-- Migration: add columns if table already exists (idempotent)
+alter table public.newsletter_subscribers add column if not exists notes text;
+
+-- Discount codes (coupon system)
+create table if not exists public.discount_codes (
+  id uuid primary key default gen_random_uuid(),
+  code text unique not null,
+  type text not null check (type in ('percent', 'fixed')),
+  value numeric not null,
+  min_order_amount numeric default 0,
+  max_uses integer,
+  uses_count integer default 0,
+  expires_at timestamptz,
+  active boolean default true,
+  created_at timestamptz default now()
+);
+
+-- Customer tags (segmentation)
+create table if not exists public.customer_tags (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references public.profiles(id) on delete cascade,
+  tag text not null,
+  created_at timestamptz default now(),
+  unique(user_id, tag)
+);
+
+-- Audit logs (admin action history)
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  admin_email text not null,
+  action text not null,
+  entity_type text not null,
+  entity_id text,
+  details jsonb,
+  created_at timestamptz default now()
+);
+
 -- ============================================================
 -- Row Level Security — enable on all tables
 -- ============================================================
@@ -153,6 +248,11 @@ alter table public.admin_users   enable row level security;
 alter table public.services      enable row level security;
 alter table public.about_team    enable row level security;
 alter table public.site_content  enable row level security;
+alter table public.email_logs    enable row level security;
+alter table public.newsletter_subscribers enable row level security;
+alter table public.discount_codes enable row level security;
+alter table public.customer_tags  enable row level security;
+alter table public.audit_logs     enable row level security;
 
 -- ============================================================
 -- Policies — drop first so re-runs never conflict
@@ -291,7 +391,7 @@ begin
     new.raw_user_meta_data->>'name',
     new.raw_user_meta_data->>'phone',
     new.raw_user_meta_data->>'address',
-    new.raw_user_meta_data->>'zone'
+    new.raw_user_meta_data->>'zone_id'
   )
   on conflict (id) do nothing;
   return new;

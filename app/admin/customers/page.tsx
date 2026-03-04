@@ -68,6 +68,7 @@ export default function CustomersPage() {
   const [loadingOrders, setLoadingOrders] = useState(false)
   const [toast,      setToast]      = useState('')
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const showToast = (msg: string) => { setToast(msg); setTimeout(() => setToast(''), 3000) }
 
   const fetchCustomers = async () => {
@@ -129,6 +130,7 @@ export default function CustomersPage() {
     setLoading(false)
   }
 
+  // eslint-disable-next-line react-hooks/set-state-in-effect
   useEffect(() => { fetchCustomers() }, [])
 
   const openCustomer = async (customer: CustomerRow) => {
