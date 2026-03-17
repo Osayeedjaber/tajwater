@@ -147,7 +147,7 @@ export default function AdminOrderDetailPage() {
 
   const cancelOrder = async () => {
     if (!order) return
-    if (!confirm('Cancel this order? If already paid, a full Stripe refund will be issued.')) return
+    if (!confirm('Cancel this order? If already paid, a full Square refund will be issued.')) return
     setUpdating(true)
 
     if (order.payment_status === 'paid') {

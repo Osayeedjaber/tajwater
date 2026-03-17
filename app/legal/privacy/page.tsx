@@ -20,7 +20,7 @@ export default function PrivacyPage() {
           <ul className="text-[#4a7fa5] leading-relaxed space-y-1 list-disc list-inside">
             <li><strong>Account information:</strong> Name, email address, phone number</li>
             <li><strong>Delivery information:</strong> Delivery address and zone</li>
-            <li><strong>Payment information:</strong> Processed securely by Stripe — we never store card numbers</li>
+            <li><strong>Payment information:</strong> Processed securely by Square — we never store card numbers</li>
             <li><strong>Order history:</strong> Products ordered, amounts, delivery dates</li>
             <li><strong>Usage data:</strong> Pages visited, browser type, IP address (for security and analytics)</li>
             <li><strong>Communications:</strong> Support tickets, emails you send us</li>
@@ -42,7 +42,7 @@ export default function PrivacyPage() {
             We do not sell your personal information. We share data only with:
           </p>
           <ul className="text-[#4a7fa5] leading-relaxed space-y-1 list-disc list-inside mt-2">
-            <li><strong>Stripe</strong> — to process payments securely</li>
+            <li><strong>Square</strong> — to process payments securely</li>
             <li><strong>Supabase</strong> — our database and authentication provider</li>
             <li><strong>Resend</strong> — to deliver transactional emails</li>
             <li><strong>Our delivery drivers</strong> — only your name, address, and order notes</li>
@@ -66,7 +66,7 @@ export default function PrivacyPage() {
 
           <h2 className="text-lg font-bold text-[#0c2340] mt-8 mb-3">6. Security</h2>
           <p className="text-[#4a7fa5] leading-relaxed">
-            We use industry-standard security measures including SSL encryption, secure authentication, and Row-Level Security on our database. Payment data is handled exclusively by Stripe (PCI-DSS compliant).
+            We use industry-standard security measures including SSL encryption, secure authentication, and Row-Level Security on our database. Payment data is handled exclusively by Square (PCI-DSS compliant).
           </p>
 
           <h2 className="text-lg font-bold text-[#0c2340] mt-8 mb-3">7. Cookies</h2>

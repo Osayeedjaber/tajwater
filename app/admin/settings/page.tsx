@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
-import { Building2, MapPin, DollarSign, Bell, CheckCircle2, RefreshCw, Mail, Download, Share2 } from 'lucide-react'
+import { Building2, MapPin, DollarSign, Bell, CheckCircle2, RefreshCw, Mail, Download, Share2, FileText } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -52,6 +52,26 @@ const BUSINESS_DEFAULTS: BusinessInfo = {
   hours:   'Mon–Fri: 7am–7pm\nSaturday: 8am–6pm\nSunday: 9am–5pm',
 }
 
+const EMAIL_TEMPLATE_KEYS = [
+  'email_confirmation_subject',
+  'email_confirmation_greeting',
+  'email_welcome_subject',
+  'email_welcome_message',
+  'email_delivery_subject',
+  'email_delivered_subject',
+] as const
+
+type EmailTemplateKey = typeof EMAIL_TEMPLATE_KEYS[number]
+
+const EMAIL_TEMPLATE_DEFAULTS: Record<EmailTemplateKey, string> = {
+  email_confirmation_subject:  'Your TajWater Order is Confirmed! 💧',
+  email_confirmation_greeting: 'Hi {{customer_name}}, your order has been received and we\'re preparing it for delivery.',
+  email_welcome_subject:       'Welcome to TajWater! 💧',
+  email_welcome_message:       'Hi {{customer_name}}, your account is ready. Fresh water is just a few clicks away.',
+  email_delivery_subject:      'Your TajWater order is on its way! 🚚',
+  email_delivered_subject:     'Your TajWater order has been delivered! 💧',
+}
+
 // ── Component ────────────────────────────────────────────────────────────────
 export default function SettingsPage() {
   const [zones,         setZones]         = useState<Zone[]>([])
@@ -60,6 +80,7 @@ export default function SettingsPage() {
   const [subscribers,   setSubscribers]   = useState<Subscriber[]>([])
   const [revenueGoal,   setRevenueGoal]   = useState('')
   const [socials,       setSocialsState]  = useState({ facebook: '', instagram: '', twitter: '' })
+  const [emailTmpl,     setEmailTmpl]     = useState<Record<EmailTemplateKey, string>>(EMAIL_TEMPLATE_DEFAULTS)
   const [loading,       setLoading]       = useState(true)
   const [saving,        setSaving]        = useState(false)
   const [toast,         setToast]         = useState('')
@@ -75,6 +96,7 @@ export default function SettingsPage() {
       'monthly_revenue_goal',
       'social_facebook', 'social_instagram', 'social_twitter',
       ...NOTIF_KEYS.map(n => n.key),
+      ...EMAIL_TEMPLATE_KEYS,
     ]
 
     const [zonesRes, contentRes, subsRes] = await Promise.all([
@@ -106,8 +128,21 @@ export default function SettingsPage() {
         instagram: map['social_instagram'] ?? '',
         twitter:   map['social_twitter']   ?? '',
       })
+      const tmpl = { ...EMAIL_TEMPLATE_DEFAULTS }
+      EMAIL_TEMPLATE_KEYS.forEach(k => { if (map[k]) tmpl[k] = map[k] })
+      setEmailTmpl(tmpl)
     }
     setLoading(false)
+  }
+
+  // ── Save: Email Templates ──────────────────────────────────────────────────
+  const saveEmailTemplates = async () => {
+    setSaving(true)
+    const rows = EMAIL_TEMPLATE_KEYS.map(k => ({ key: k, value: emailTmpl[k] }))
+    const { error } = await supabase.from('site_content').upsert(rows, { onConflict: 'key' })
+    setSaving(false)
+    if (error) { showToast('Error saving — please try again.'); return }
+    showToast('Email templates saved!')
   }
 
   // ── Save: Socials ──────────────────────────────────────────────────────────
@@ -199,6 +234,7 @@ export default function SettingsPage() {
           <TabsTrigger value="notifications" className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Notifications</TabsTrigger>
           <TabsTrigger value="subscribers"   className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Subscribers</TabsTrigger>
           <TabsTrigger value="socials"        className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Socials</TabsTrigger>
+          <TabsTrigger value="email-templates" className="data-[state=active]:bg-[#0097a7] data-[state=active]:text-white text-xs">Emails</TabsTrigger>
         </TabsList>
 
         {/* ── Business tab ────────────────────────────────────────────── */}
@@ -472,6 +508,113 @@ export default function SettingsPage() {
 
             <Button onClick={saveSocials} disabled={saving || loading} className="bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white gap-2">
               {saving ? 'Saving...' : <><CheckCircle2 className="w-4 h-4" /> Save Social Links</>}
+            </Button>
+          </motion.div>
+        </TabsContent>
+        {/* ── Email Templates tab ──────────────────────────────────────── */}
+        <TabsContent value="email-templates">
+          <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }}
+            className="bg-white rounded-3xl border border-[#cce7f0] shadow-sm p-6 space-y-6">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-[#0097a7]" />
+              <h3 className="font-bold text-[#0c2340]">Email Templates</h3>
+              <span className="ml-auto text-xs text-[#4a7fa5]">Saved to Supabase · Used by Resend</span>
+            </div>
+            <p className="text-xs text-[#4a7fa5] bg-[#f0f9ff] rounded-xl px-4 py-3 border border-[#cce7f0]">
+              Edit subject lines and greeting text for automated emails. Use <code className="bg-[#e0f7fa] px-1 rounded">{'{{customer_name}}'}</code>, <code className="bg-[#e0f7fa] px-1 rounded">{'{{order_id}}'}</code>, <code className="bg-[#e0f7fa] px-1 rounded">{'{{total}}'}</code> as variables.
+            </p>
+
+            {/* Order Confirmation */}
+            <div className="rounded-2xl border border-[#cce7f0] overflow-hidden">
+              <div className="bg-[#f0f9ff] px-5 py-3 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#0097a7]" />
+                <span className="text-sm font-semibold text-[#0c2340]">Order Confirmation</span>
+                <span className="ml-auto text-xs text-[#4a7fa5]">Sent after successful payment</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Subject Line</label>
+                  <Input
+                    value={emailTmpl.email_confirmation_subject}
+                    onChange={e => setEmailTmpl(p => ({ ...p, email_confirmation_subject: e.target.value }))}
+                    placeholder={EMAIL_TEMPLATE_DEFAULTS.email_confirmation_subject}
+                    className="border-[#cce7f0]"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Greeting / Intro Paragraph</label>
+                  <Textarea
+                    value={emailTmpl.email_confirmation_greeting}
+                    onChange={e => setEmailTmpl(p => ({ ...p, email_confirmation_greeting: e.target.value }))}
+                    placeholder={EMAIL_TEMPLATE_DEFAULTS.email_confirmation_greeting}
+                    className="border-[#cce7f0] resize-none"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Welcome Email */}
+            <div className="rounded-2xl border border-[#cce7f0] overflow-hidden">
+              <div className="bg-[#f0f9ff] px-5 py-3 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#0097a7]" />
+                <span className="text-sm font-semibold text-[#0c2340]">Welcome Email</span>
+                <span className="ml-auto text-xs text-[#4a7fa5]">Sent on new customer registration</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Subject Line</label>
+                  <Input
+                    value={emailTmpl.email_welcome_subject}
+                    onChange={e => setEmailTmpl(p => ({ ...p, email_welcome_subject: e.target.value }))}
+                    placeholder={EMAIL_TEMPLATE_DEFAULTS.email_welcome_subject}
+                    className="border-[#cce7f0]"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Message Body</label>
+                  <Textarea
+                    value={emailTmpl.email_welcome_message}
+                    onChange={e => setEmailTmpl(p => ({ ...p, email_welcome_message: e.target.value }))}
+                    placeholder={EMAIL_TEMPLATE_DEFAULTS.email_welcome_message}
+                    className="border-[#cce7f0] resize-none"
+                    rows={2}
+                  />
+                </div>
+              </div>
+            </div>
+
+            {/* Status Emails */}
+            <div className="rounded-2xl border border-[#cce7f0] overflow-hidden">
+              <div className="bg-[#f0f9ff] px-5 py-3 flex items-center gap-2">
+                <Mail className="w-4 h-4 text-[#0097a7]" />
+                <span className="text-sm font-semibold text-[#0c2340]">Status Update Emails</span>
+                <span className="ml-auto text-xs text-[#4a7fa5]">Sent when admin updates order status</span>
+              </div>
+              <div className="p-5 space-y-4">
+                <div>
+                  <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Out for Delivery — Subject</label>
+                  <Input
+                    value={emailTmpl.email_delivery_subject}
+                    onChange={e => setEmailTmpl(p => ({ ...p, email_delivery_subject: e.target.value }))}
+                    placeholder={EMAIL_TEMPLATE_DEFAULTS.email_delivery_subject}
+                    className="border-[#cce7f0]"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm font-medium text-[#0c2340] mb-1.5 block">Delivered — Subject</label>
+                  <Input
+                    value={emailTmpl.email_delivered_subject}
+                    onChange={e => setEmailTmpl(p => ({ ...p, email_delivered_subject: e.target.value }))}
+                    placeholder={EMAIL_TEMPLATE_DEFAULTS.email_delivered_subject}
+                    className="border-[#cce7f0]"
+                  />
+                </div>
+              </div>
+            </div>
+
+            <Button onClick={saveEmailTemplates} disabled={saving || loading} className="bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white gap-2">
+              {saving ? 'Saving...' : <><CheckCircle2 className="w-4 h-4" /> Save Email Templates</>}
             </Button>
           </motion.div>
         </TabsContent>

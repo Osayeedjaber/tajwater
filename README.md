@@ -10,7 +10,7 @@
 [![TypeScript](https://img.shields.io/badge/TypeScript-3178C6?style=for-the-badge&logo=typescript&logoColor=white)](https://www.typescriptlang.org)
 [![Tailwind CSS](https://img.shields.io/badge/Tailwind_v4-06B6D4?style=for-the-badge&logo=tailwindcss&logoColor=white)](https://tailwindcss.com)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com)
-[![Stripe](https://img.shields.io/badge/Stripe-635BFF?style=for-the-badge&logo=stripe&logoColor=white)](https://stripe.com)
+[![Square](https://img.shields.io/badge/Square-000000?style=for-the-badge&logo=square&logoColor=white)](https://squareup.com)
 
 [Live Demo](https://tajwater.ca) · [Report Bug](https://github.com/Osayeedjaber/tajwater/issues)
 
@@ -33,7 +33,7 @@ TajWater is a full-stack e-commerce platform built for a water delivery company 
 | **State** | Zustand (cart — localStorage persist) |
 | **Database** | Supabase (PostgreSQL + RLS) |
 | **Auth** | Supabase Auth (email/password + Google OAuth) |
-| **Payments** | Stripe (PaymentIntents + Webhooks) |
+| **Payments** | Square (Web Payments SDK + Webhooks) |
 | **Email** | Resend (transactional HTML emails) |
 | **Deployment** | Vercel |
 
@@ -80,7 +80,7 @@ app/
   auth/           Login, Register, Forgot, Reset, OAuth Callback
   dashboard/      Customer portal (orders, subscription, profile, support)
   admin/          Admin portal (10 sub-pages, role-gated)
-  api/            create-payment-intent, stripe/webhook, invoice/[orderId]
+  api/            create-payment, square/webhook, invoice/[orderId]
 
 components/
   layout/         Navbar, Footer
@@ -102,7 +102,7 @@ supabase/         migrations/
 
 - Node.js 20+
 - A [Supabase](https://supabase.com) project
-- A [Stripe](https://stripe.com) account
+- A [Square](https://squareup.com) developer account
 - A [Resend](https://resend.com) account
 
 ### Installation
@@ -126,8 +126,11 @@ NEXT_PUBLIC_SUPABASE_URL=
 NEXT_PUBLIC_SUPABASE_ANON_KEY=
 SUPABASE_SERVICE_ROLE_KEY=
 
-STRIPE_SECRET_KEY=
-STRIPE_WEBHOOK_SECRET=
+SQUARE_ACCESS_TOKEN=
+SQUARE_ENVIRONMENT=sandbox
+SQUARE_WEBHOOK_SIGNATURE_KEY=
+NEXT_PUBLIC_SQUARE_APPLICATION_ID=
+NEXT_PUBLIC_SQUARE_LOCATION_ID=
 
 RESEND_API_KEY=
 RESEND_FROM_EMAIL=TajWater <orders@yourdomain.com>

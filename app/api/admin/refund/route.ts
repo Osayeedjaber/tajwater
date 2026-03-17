@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { stripe } from '@/lib/stripe'
+import { getSquareClient } from '@/lib/square'
 import { createServerClient } from '@/lib/supabase'
 import { createServerClient as createSsrClient } from '@supabase/ssr'
 
@@ -40,7 +40,7 @@ export async function POST(req: NextRequest) {
   // Fetch order
   const { data: order, error: orderError } = await db
     .from('orders')
-    .select('id, total, stripe_payment_intent_id, payment_status')
+    .select('id, total, square_payment_id, payment_status')
     .eq('id', order_id)
     .single()
 
@@ -48,8 +48,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Order not found' }, { status: 404 })
   }
 
-  if (!order.stripe_payment_intent_id) {
-    return NextResponse.json({ error: 'No Stripe payment found for this order' }, { status: 400 })
+  if (!order.square_payment_id) {
+    return NextResponse.json({ error: 'No Square payment found for this order' }, { status: 400 })
   }
 
   if (order.payment_status === 'refunded') {
@@ -60,13 +60,18 @@ export async function POST(req: NextRequest) {
   const refundCents = Math.round(refundAmount * 100)
 
   try {
-    await stripe.refunds.create({
-      payment_intent: order.stripe_payment_intent_id,
-      amount: refundCents,
+    const square = getSquareClient()
+    await square.refundsApi.refundPayment({
+      paymentId: order.square_payment_id,
+      idempotencyKey: crypto.randomUUID(),
+      amountMoney: {
+        amount: BigInt(refundCents),
+        currency: 'CAD',
+      },
     })
   } catch (err) {
-    const message = err instanceof Error ? err.message : 'Stripe refund failed'
-    console.error('Stripe refund error:', err)
+    const message = err instanceof Error ? err.message : 'Square refund failed'
+    console.error('Square refund error:', err)
     return NextResponse.json({ error: message }, { status: 500 })
   }
 

@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { Plus, Edit, Trash2, AlertTriangle, Package, CheckCircle2, Search, Minus, Upload, X } from 'lucide-react'
+import Link from 'next/link'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Input } from '@/components/ui/input'
@@ -213,9 +214,11 @@ export default function AdminProductsPage() {
                   </div>
                 </div>
                 <div className="flex gap-1">
-                  <button onClick={() => openEdit(product)} className="w-8 h-8 rounded-lg border border-[#cce7f0] flex items-center justify-center text-[#4a7fa5] hover:border-[#0097a7] hover:text-[#0097a7] transition-colors">
-                    <Edit className="w-3.5 h-3.5" />
-                  </button>
+                  <Link href={`/admin/products/${product.id}`}>
+                    <button className="w-8 h-8 rounded-lg border border-[#cce7f0] flex items-center justify-center text-[#4a7fa5] hover:border-[#0097a7] hover:text-[#0097a7] transition-colors" title="Edit product">
+                      <Edit className="w-3.5 h-3.5" />
+                    </button>
+                  </Link>
                   <button onClick={() => handleDelete(product.id)} className="w-8 h-8 rounded-lg border border-[#cce7f0] flex items-center justify-center text-[#4a7fa5] hover:border-red-400 hover:text-red-500 transition-colors">
                     <Trash2 className="w-3.5 h-3.5" />
                   </button>

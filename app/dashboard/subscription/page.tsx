@@ -31,24 +31,31 @@ export default function SubscriptionPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) return
 
-      const { data } = await supabase
-        .from('subscriptions')
-        .select('id, quantity, frequency, status, next_delivery, product:products(name, price)')
-        .eq('user_id', session.user.id)
-        .neq('status', 'cancelled')
-        .order('id', { ascending: false })
-        .limit(1)
-        .maybeSingle()
+        const { data } = await supabase
+          .from('subscriptions')
+          .select('id, quantity, frequency, status, next_delivery, product:products(name, price)')
+          .eq('user_id', session.user.id)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
 
-      if (data) {
-        setSub(data as unknown as SubData)
-        setQty(data.quantity)
-        setFreq(data.frequency)
+        if (data) {
+          // Supabase FK join may return product as an array — normalise to object
+          const raw = data as unknown as SubData & { product: SubData['product'] | SubData['product'][] }
+          const productNorm: SubData['product'] = Array.isArray(raw.product) ? (raw.product[0] ?? null) : raw.product
+          const normalised: SubData = { ...raw, product: productNorm }
+          setSub(normalised)
+          setQty(normalised.quantity)
+          setFreq(normalised.frequency)
+        }
+      } finally {
+        setLoading(false)
       }
-      setLoading(false)
     }
     load()
   }, [])

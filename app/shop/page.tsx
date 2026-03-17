@@ -10,6 +10,7 @@ import { useCart } from '@/store/cartStore'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { Product } from '@/types'
+import CartToast from '@/components/shared/CartToast'
 
 const categoryEmoji: Record<string, string> = {
   water: '💧', equipment: '🔧', subscription: '🔄', accessories: '🧹',
@@ -65,7 +66,7 @@ export default function ShopPage() {
     const freq = subscribeMode[product.id] ? (subFreq[product.id] ?? 'weekly') : undefined
     addItem(product, freq)
     setAddedId(product.id)
-    setTimeout(() => setAddedId(null), 1500)
+    setTimeout(() => setAddedId(null), 2500)
   }
 
   const canSubscribe = (p: Product) => p.category === 'water' || p.category === 'subscription'
@@ -73,6 +74,7 @@ export default function ShopPage() {
 
   return (
     <div className="min-h-screen">
+      <CartToast product={products.find(p => p.id === addedId) ?? null} visible={addedId !== null} />
       {/* Hero */}
       <section className="relative py-24 hero-gradient overflow-hidden">
         <div className="absolute bottom-0 left-0 right-0">

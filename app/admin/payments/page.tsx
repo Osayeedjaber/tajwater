@@ -22,7 +22,7 @@ type TxnRow = {
   refund_amount: number | null
   created_at: string
   customer_name: string | null
-  stripe_payment_intent_id: string | null
+  square_payment_id: string | null
   zones: { name: string } | { name: string }[] | null
   profile: { name: string } | null
 }
@@ -96,7 +96,7 @@ export default function PaymentsPage() {
 
     const { data: rows, error } = await supabase
       .from('orders')
-      .select('id, user_id, status, payment_status, total, refund_amount, created_at, customer_name, stripe_payment_intent_id, zones(name)')
+      .select('id, user_id, status, payment_status, total, refund_amount, created_at, customer_name, square_payment_id, zones(name)')
       .order('created_at', { ascending: false })
       .limit(300)
 
@@ -142,7 +142,7 @@ export default function PaymentsPage() {
         shortId(t.id).toLowerCase().includes(q) ||
         (t.profile?.name ?? t.customer_name ?? '').toLowerCase().includes(q) ||
         getZoneName(t.zones).toLowerCase().includes(q) ||
-        (t.stripe_payment_intent_id ?? '').toLowerCase().includes(q)
+        (t.square_payment_id ?? '').toLowerCase().includes(q)
       )
     })
 
@@ -210,7 +210,7 @@ export default function PaymentsPage() {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-2xl font-extrabold text-[#0c2340]">Payments</h2>
-          <p className="text-sm text-[#4a7fa5]">Stripe-powered · auto-updated via webhooks · live from Supabase</p>
+          <p className="text-sm text-[#4a7fa5]">Square-powered · auto-updated via webhooks · live from Supabase</p>
         </div>
         <div className="flex gap-2">
           <Button size="sm" variant="outline" onClick={fetchData} className="border-[#cce7f0] text-[#4a7fa5]">
@@ -224,7 +224,7 @@ export default function PaymentsPage() {
               zone: getZoneName(t.zones),
               amount: t.total.toFixed(2),
               payment_status: t.payment_status ?? 'pending',
-              stripe_pi: t.stripe_payment_intent_id ?? '—',
+              square_id: t.square_payment_id ?? '—',
               date: fmtDate(t.created_at),
             })))}
           >
@@ -255,10 +255,10 @@ export default function PaymentsPage() {
         })}
       </div>
 
-      {/* Stripe note */}
+      {/* Square note */}
       <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-[#f0f9ff] border border-[#cce7f0] text-xs text-[#4a7fa5]">
         <CreditCard className="w-4 h-4 text-[#0097a7] shrink-0" />
-        Payment statuses update automatically when Stripe fires webhooks (<code className="bg-white px-1 py-0.5 rounded text-[#0097a7]">payment_intent.succeeded</code>, <code className="bg-white px-1 py-0.5 rounded text-[#0097a7]">charge.refunded</code>). Configure your webhook at <strong className="text-[#0c2340]">stripe.com/webhooks</strong> → endpoint: <code className="text-[#0097a7]">/api/stripe/webhook</code>
+        Payment statuses update automatically when Square fires webhooks (<code className="bg-white px-1 py-0.5 rounded text-[#0097a7]">payment.completed</code>, <code className="bg-white px-1 py-0.5 rounded text-[#0097a7]">refund.created</code>). Configure your webhook at <strong className="text-[#0c2340]">squareup.com/dashboard</strong> → Webhooks → endpoint: <code className="text-[#0097a7]">/api/square/webhook</code>
       </div>
 
       {/* Disputes alert */}
@@ -270,7 +270,7 @@ export default function PaymentsPage() {
               {txns.filter(t => t.payment_status === 'disputed').length} disputed payment{txns.filter(t => t.payment_status === 'disputed').length > 1 ? 's' : ''} require attention
             </p>
             <p className="mt-0.5 text-orange-600">
-              Use the &quot;Stripe&quot; button on each disputed row to submit evidence in the Stripe Dashboard. Disputes must be responded to within 7–10 days.
+              Use the &quot;Square&quot; button on each disputed row to submit evidence in the Square Dashboard. Disputes must be responded to within 7–10 days.
             </p>
           </div>
         </div>
@@ -281,7 +281,7 @@ export default function PaymentsPage() {
         <div className="relative flex-1">
           <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#0097a7]" />
           <Input
-            placeholder="Search by order ID, customer, zone, or Stripe PI..."
+            placeholder="Search by order ID, customer, zone, or Square ID..."
             value={search}
             onChange={e => setSearch(e.target.value)}
             className="pl-10 border-[#cce7f0] bg-white"
@@ -313,7 +313,7 @@ export default function PaymentsPage() {
         <div className="bg-white rounded-3xl border border-[#cce7f0] p-16 text-center">
           <Package className="w-10 h-10 text-[#cce7f0] mx-auto mb-3" />
           <p className="text-[#4a7fa5] font-medium">No transactions yet</p>
-          <p className="text-xs text-[#4a7fa5] mt-1">Transactions appear here automatically once customers place orders and pay via Stripe</p>
+          <p className="text-xs text-[#4a7fa5] mt-1">Transactions appear here automatically once customers place orders and pay via Square</p>
         </div>
       ) : (
         <div className="bg-white rounded-3xl border border-[#cce7f0] shadow-sm overflow-hidden">
@@ -327,7 +327,7 @@ export default function PaymentsPage() {
                     { label: 'Zone',      cls: 'hidden sm:table-cell' },
                     { label: 'Amount',    cls: '' },
                     { label: 'Payment',   cls: '' },
-                    { label: 'Stripe PI', cls: 'hidden lg:table-cell' },
+                    { label: 'Square ID', cls: 'hidden lg:table-cell' },
                     { label: 'Date',      cls: 'hidden sm:table-cell' },
                     { label: 'Actions',   cls: '' },
                   ].map(h => (
@@ -350,7 +350,7 @@ export default function PaymentsPage() {
                         <Badge className={`text-[10px] ${pb.color}`}>{pb.label}</Badge>
                       </td>
                       <td className="hidden lg:table-cell px-4 py-3 font-mono text-[10px] text-[#4a7fa5] max-w-[140px] truncate">
-                        {txn.stripe_payment_intent_id ?? '—'}
+                        {txn.square_payment_id ?? '—'}
                       </td>
                       <td className="hidden sm:table-cell px-4 py-3 text-xs text-[#4a7fa5] whitespace-nowrap">{fmtDate(txn.created_at)}</td>
                       <td className="px-4 py-3">
@@ -360,12 +360,12 @@ export default function PaymentsPage() {
                             <RotateCcw className="w-3 h-3" /> Refund
                           </Button>
                         )}
-                        {txn.payment_status === 'disputed' && txn.stripe_payment_intent_id && (
-                          <a href={`https://dashboard.stripe.com/payments/${txn.stripe_payment_intent_id}`}
+                        {txn.payment_status === 'disputed' && txn.square_payment_id && (
+                          <a href={`https://squareup.com/dashboard/sales/transactions`}
                             target="_blank" rel="noreferrer">
                             <Button size="sm" variant="outline"
                               className="border-orange-200 text-orange-600 hover:bg-orange-50 h-7 text-xs gap-1">
-                              <ExternalLink className="w-3 h-3" /> Stripe
+                              <ExternalLink className="w-3 h-3" /> Square
                             </Button>
                           </a>
                         )}

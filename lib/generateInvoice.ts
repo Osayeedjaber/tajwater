@@ -13,6 +13,9 @@ export type InvoiceOrderData = {
   zones: { name: string } | null
   order_items: InvoiceOrderItem[]
   profiles: { name: string; email: string } | null
+  tax_amount?: number | null
+  discount_amount?: number | null
+  notes?: string | null
 }
 export type CompanyInfo = { name: string; address: string; phone: string; email: string; website: string }
 
@@ -61,7 +64,9 @@ function InvoicePDF({ order, companyInfo }: { order: InvoiceOrderData; companyIn
   const customerName = order.profiles?.name ?? order.customer_name ?? 'Guest Customer'
   const zone         = (order.zones as { name: string } | null)?.name ?? '—'
   const subtotal     = order.order_items.reduce((s, i) => s + i.price * i.quantity, 0)
-  const deliveryFee  = parseFloat((order.total - subtotal).toFixed(2))
+  const discountAmt  = Number(order.discount_amount ?? 0)
+  const taxAmt       = Number(order.tax_amount ?? 0)
+  const deliveryFee  = Math.max(0, parseFloat((order.total - subtotal + discountAmt - taxAmt).toFixed(2)))
   const statusColor: Record<string, string> = { paid: '#16a34a', pending: '#d97706', failed: '#dc2626', refunded: '#dc2626' }
   const payStatus    = order.payment_status ?? 'pending'
 
@@ -124,9 +129,17 @@ function InvoicePDF({ order, companyInfo }: { order: InvoiceOrderData; companyIn
             React.createElement(Text, { style: styles.totalLabel }, 'Subtotal'),
             React.createElement(Text, { style: styles.totalValue }, `$${subtotal.toFixed(2)}`),
           ),
-          deliveryFee > 0 && React.createElement(View, { style: styles.totalRow },
+          discountAmt > 0 && React.createElement(View, { style: styles.totalRow },
+            React.createElement(Text, { style: { ...styles.totalLabel, color: '#16a34a' } }, 'Discount'),
+            React.createElement(Text, { style: { ...styles.totalValue, color: '#16a34a' } }, `−$${discountAmt.toFixed(2)}`),
+          ),
+          deliveryFee > 0.01 && React.createElement(View, { style: styles.totalRow },
             React.createElement(Text, { style: styles.totalLabel }, 'Delivery Fee'),
             React.createElement(Text, { style: styles.totalValue }, `$${deliveryFee.toFixed(2)}`),
+          ),
+          taxAmt > 0 && React.createElement(View, { style: styles.totalRow },
+            React.createElement(Text, { style: styles.totalLabel }, 'Tax (GST 5% + PST 7%)'),
+            React.createElement(Text, { style: styles.totalValue }, `$${taxAmt.toFixed(2)}`),
           ),
           React.createElement(View, { style: styles.grandRow },
             React.createElement(Text, { style: styles.grandLabel }, 'Total'),

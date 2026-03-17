@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { motion } from 'framer-motion'
-import { Truck, MapPin, Users, Clock, RefreshCw, CheckCircle2, Package, Printer, Filter, Download } from 'lucide-react'
+import { Truck, MapPin, Users, Clock, RefreshCw, CheckCircle2, Package, Filter, Download } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { supabase } from '@/lib/supabase'
@@ -175,9 +175,13 @@ export default function DeliveriesPage() {
             className="border-[#cce7f0] text-[#4a7fa5] gap-1.5">
             <Download className="w-3.5 h-3.5" /> Export CSV
           </Button>
-          <Button size="sm" variant="outline" onClick={() => window.print()}
+          <Button size="sm" variant="outline"
+            onClick={() => {
+              const today = new Date().toISOString().slice(0, 10)
+              window.open(`/api/admin/delivery-manifest?date=${today}`, '_blank')
+            }}
             className="border-[#cce7f0] text-[#4a7fa5] gap-1.5">
-            <Printer className="w-3.5 h-3.5" /> Print Manifest
+            <Download className="w-3.5 h-3.5" /> PDF Manifest
           </Button>
           <Button size="sm" variant="outline" onClick={fetchData} className="border-[#cce7f0] text-[#4a7fa5]">
             <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />

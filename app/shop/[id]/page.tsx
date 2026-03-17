@@ -3,13 +3,14 @@
 import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
-import { ShoppingCart, Plus, Minus, ArrowLeft, Star, Check, Package, Droplets, RefreshCw, Shield } from 'lucide-react'
+import { ShoppingCart, Plus, Minus, ArrowLeft, Star, Check, Package, Droplets, RefreshCw, Shield, Zap } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { useCart } from '@/store/cartStore'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import type { Product } from '@/types'
+import CartToast from '@/components/shared/CartToast'
 
 const categoryColors: Record<string, string> = {
   water: '#0097a7', equipment: '#1565c0', subscription: '#006064', accessories: '#00acc1',
@@ -71,6 +72,13 @@ export default function ProductDetailPage() {
     setTimeout(() => setAdded(false), 2000)
   }
 
+  const handleBuyNow = () => {
+    if (!product) return
+    const freq = subscribeMode ? subFreq : undefined
+    if (qty === 0) addItem(product, freq)
+    router.push('/checkout')
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen bg-[#f0f9ff] pt-20">
@@ -96,6 +104,7 @@ export default function ProductDetailPage() {
 
   return (
     <div className="min-h-screen bg-[#f0f9ff] pt-20">
+      <CartToast product={product} visible={added} />
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-sm text-[#4a7fa5] mb-8">
@@ -266,20 +275,36 @@ export default function ProductDetailPage() {
                   </Link>
                 </div>
               ) : (
-                <motion.button
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  disabled={product.stock === 0}
-                  onClick={handleAdd}
-                  className="w-full h-12 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                  style={{ background: added ? '#22c55e' : `linear-gradient(135deg, ${color}, ${color}cc)` }}
-                >
-                  {added ? (
-                    <><Check className="w-5 h-5" /> Added to Cart!</>
-                  ) : (
-                    <><ShoppingCart className="w-5 h-5" /> {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}</>
-                  )}
-                </motion.button>
+                <div className="flex gap-3">
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={product.stock === 0}
+                    onClick={handleAdd}
+                    className="flex-1 h-12 rounded-xl font-semibold flex items-center justify-center gap-2 transition-all border-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{
+                      borderColor: added ? '#22c55e' : color,
+                      color: added ? '#22c55e' : color,
+                      background: added ? '#f0fdf4' : 'white',
+                    }}
+                  >
+                    {added ? (
+                      <><Check className="w-5 h-5" /> Added!</>
+                    ) : (
+                      <><ShoppingCart className="w-5 h-5" /> {product.stock === 0 ? 'Out of Stock' : 'Add to Cart'}</>
+                    )}
+                  </motion.button>
+                  <motion.button
+                    whileHover={{ scale: 1.02 }}
+                    whileTap={{ scale: 0.98 }}
+                    disabled={product.stock === 0}
+                    onClick={handleBuyNow}
+                    className="flex-1 h-12 rounded-xl text-white font-semibold flex items-center justify-center gap-2 transition-all disabled:opacity-50 disabled:cursor-not-allowed"
+                    style={{ background: `linear-gradient(135deg, ${color}, ${color}cc)` }}
+                  >
+                    <Zap className="w-5 h-5" /> Buy Now
+                  </motion.button>
+                </div>
               )}
 
               <AnimatePresence>

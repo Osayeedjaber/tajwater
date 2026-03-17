@@ -39,8 +39,19 @@ export async function POST(req: NextRequest) {
     const fromEmail = process.env.RESEND_FROM_EMAIL ?? 'TajWater <orders@tajwater.ca>'
     const customerName = name || 'there'
 
-    const html = buildWelcomeEmail({ customerName })
-    const subject = 'Welcome to TajWater! 💧'
+    // Fetch email template overrides from site_content
+    const { data: tmplRows } = await db
+      .from('site_content')
+      .select('key, value')
+      .in('key', ['email_welcome_subject', 'email_welcome_message'])
+    const tmpl: Record<string, string> = {}
+    for (const r of (tmplRows ?? [])) tmpl[r.key] = r.value
+
+    const html = buildWelcomeEmail({
+      customerName,
+      message: tmpl['email_welcome_message'] || undefined,
+    })
+    const subject = tmpl['email_welcome_subject'] || 'Welcome to TajWater! 💧'
 
     let resendId: string | undefined
     let emailStatus = 'sent'

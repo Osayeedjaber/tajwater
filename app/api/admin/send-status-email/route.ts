@@ -79,12 +79,20 @@ export async function POST(request: NextRequest) {
     let html: string
     let subject: string
 
+    // Fetch email subject overrides
+    const { data: tmplRows } = await db
+      .from('site_content')
+      .select('key, value')
+      .in('key', ['email_delivery_subject', 'email_delivered_subject'])
+    const tmpl: Record<string, string> = {}
+    for (const r of (tmplRows ?? [])) tmpl[r.key] = r.value
+
     if (newStatus === 'out_for_delivery') {
       html = buildOutForDeliveryEmail({ orderId, customerName: name, zone: zoneName })
-      subject = `Your TajWater order is on its way!`
+      subject = tmpl['email_delivery_subject'] || `Your TajWater order is on its way!`
     } else if (newStatus === 'delivered') {
       html = buildDeliveredEmail({ orderId, customerName: name })
-      subject = `Your TajWater order has been delivered!`
+      subject = tmpl['email_delivered_subject'] || `Your TajWater order has been delivered!`
     } else {
       return NextResponse.json({ skipped: true, reason: 'status not handled' })
     }

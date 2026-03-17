@@ -24,7 +24,7 @@ export default function TermsPage() {
 
           <h2 className="text-lg font-bold text-[#0c2340] mt-8 mb-3">3. Orders and Payment</h2>
           <p className="text-[#4a7fa5] leading-relaxed">
-            All orders are subject to product availability. Prices are displayed in Canadian dollars (CAD) and include applicable taxes (GST + PST). Payment is processed securely through Stripe at the time of order. We reserve the right to cancel or refuse any order.
+            All orders are subject to product availability. Prices are displayed in Canadian dollars (CAD) and include applicable taxes (GST + PST). Payment is processed securely through Square at the time of order. We reserve the right to cancel or refuse any order.
           </p>
 
           <h2 className="text-lg font-bold text-[#0c2340] mt-8 mb-3">4. Delivery</h2>

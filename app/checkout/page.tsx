@@ -9,111 +9,20 @@ import { useCart } from '@/store/cartStore'
 import Link from 'next/link'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
-import { loadStripe } from '@stripe/stripe-js'
-import { Elements, PaymentElement, useStripe, useElements } from '@stripe/react-stripe-js'
+import { PaymentForm, CreditCard as SquareCreditCard } from 'react-square-web-payments-sdk'
 import { supabase } from '@/lib/supabase'
-
-const stripePromise = loadStripe(process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY ?? '')
 
 type Step = 'cart' | 'address' | 'payment' | 'confirmed'
 type Zone = { id: string; name: string; delivery_fee: number }
-
-// --- Inner payment form that uses Stripe hooks ---
-function StripePaymentForm({
-  orderTotal,
-  onSuccess,
-  onBack,
-}: {
-  orderTotal: number
-  onSuccess: () => void
-  onBack: () => void
-}) {
-  const stripe = useStripe()
-  const elements = useElements()
-  const [processing, setProcessing] = useState(false)
-  const [payError, setPayError] = useState('')
-
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault()
-    if (!stripe || !elements) return
-    setProcessing(true)
-    setPayError('')
-
-    const { error } = await stripe.confirmPayment({
-      elements,
-      confirmParams: {
-        return_url: `${window.location.origin}/checkout`,
-      },
-      redirect: 'if_required',
-    })
-
-    if (error) {
-      setPayError(error.message ?? 'Payment failed. Please try again.')
-      setProcessing(false)
-    } else {
-      onSuccess()
-    }
-  }
-
-  return (
-    <form onSubmit={handleSubmit} className="p-5 space-y-4">
-      <PaymentElement
-        options={{
-          layout: 'tabs',
-          fields: { billingDetails: { name: 'auto' } },
-        }}
-      />
-      {payError && (
-        <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
-          <AlertCircle className="w-4 h-4 shrink-0" />
-          {payError}
-        </div>
-      )}
-      <p className="text-xs text-[#4a7fa5]">
-        We also accept e-Transfer and cash on delivery — call us to arrange.
-      </p>
-      <p className="text-xs text-[#4a7fa5]">
-        By completing your purchase you agree to our{' '}
-        <a href="/legal/terms" target="_blank" className="underline hover:text-[#0097a7]">Terms of Service</a>
-        {' '}and{' '}
-        <a href="/legal/privacy" target="_blank" className="underline hover:text-[#0097a7]">Privacy Policy</a>.
-      </p>
-      <div className="flex gap-3 pt-2">
-        <Button type="button" variant="outline" onClick={onBack} className="flex-1 border-[#cce7f0]">
-          Back
-        </Button>
-        <Button
-          type="submit"
-          disabled={!stripe || processing}
-          className="flex-1 bg-gradient-to-r from-[#0097a7] to-[#1565c0] text-white"
-        >
-          {processing ? (
-            <span className="flex items-center gap-2">
-              <motion.div
-                animate={{ rotate: 360 }}
-                transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full"
-              />
-              Processing...
-            </span>
-          ) : (
-            `Pay $${orderTotal.toFixed(2)}`
-          )}
-        </Button>
-      </div>
-    </form>
-  )
-}
 
 // --- Main checkout page ---
 export default function CheckoutPage() {
   const { items, updateQuantity, removeItem, total, clearCart } = useCart()
   const [step, setStep] = useState<Step>('cart')
-  const [address, setAddress] = useState({ name: '', phone: '', street: '', city: '', zone: '', postal: '', notes: '' })
+  const [address, setAddress] = useState({ name: '', phone: '', street: '', city: '', zone: '', postal: '', notes: '', email: '' })
   const [zones, setZones] = useState<Zone[]>([])
-  const [clientSecret, setClientSecret] = useState('')
   const [intentError, setIntentError] = useState('')
-  const [loadingIntent, setLoadingIntent] = useState(false)
+  const [processing, setProcessing] = useState(false)
   const [orderId, setOrderId] = useState('')
   const [userId, setUserId] = useState<string | null>(null)
   const [authChecked, setAuthChecked] = useState(false)
@@ -154,7 +63,7 @@ export default function CheckoutPage() {
 
       const { data: profile } = await supabase
         .from('profiles')
-        .select('name, phone, delivery_address, zone_id')
+        .select('name, phone, delivery_address, zone_id, email')
         .eq('id', session.user.id)
         .single()
 
@@ -175,7 +84,10 @@ export default function CheckoutPage() {
           phone:  profile.phone ?? '',
           street: profile.delivery_address ?? '',
           zone:   zoneName,
+          email:  profile.email ?? session.user.email ?? '',
         }))
+      } else {
+        setAddress(prev => ({ ...prev, email: session.user.email ?? '' }))
       }
       setAuthChecked(true)
     }
@@ -211,15 +123,16 @@ export default function CheckoutPage() {
     setCouponInput('')
   }
 
-  // Create PaymentIntent + Supabase order when moving to payment step
-  const createIntent = useCallback(async () => {
-    setLoadingIntent(true)
+  // Handle Square card tokenization — send nonce to server to create payment
+  const handleCardTokenized = useCallback(async (token: { token: string }) => {
+    setProcessing(true)
     setIntentError('')
     try {
-      const res = await fetch('/api/create-payment-intent', {
+      const res = await fetch('/api/create-payment', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
+          sourceId: token.token,
           amount: orderTotal,
           items: items.map(i => ({
             product_id:          i.product.id,
@@ -233,6 +146,7 @@ export default function CheckoutPage() {
             street: address.street,
             zone:   address.zone,
             postal: address.postal,
+            email:  address.email,
           },
           notes: address.notes || null,
           userId,
@@ -242,23 +156,18 @@ export default function CheckoutPage() {
       })
       const data = await res.json()
       if (data.error) throw new Error(data.error)
-      setClientSecret(data.clientSecret)
       setOrderId(data.orderId)
       setServerTotal(data.serverTotal ?? orderTotal)
       setTaxAmount(data.taxAmount ?? tax)
       if (data.deliveryFee !== undefined) setDeliveryFee(data.deliveryFee)
+      clearCart()
+      setStep('confirmed')
     } catch (err) {
-      setIntentError(err instanceof Error ? err.message : 'Failed to initialize payment. Please try again.')
+      setIntentError(err instanceof Error ? err.message : 'Payment failed. Please try again.')
     } finally {
-      setLoadingIntent(false)
+      setProcessing(false)
     }
-  }, [orderTotal, items, address, userId, tax, appliedDiscount])
-
-  useEffect(() => {
-    if (step === 'payment' && !clientSecret) {
-      createIntent()
-    }
-  }, [step, clientSecret, createIntent])
+  }, [orderTotal, items, address, userId, tax, appliedDiscount, clearCart])
 
   // Show nothing while auth check is in progress
   if (!authChecked) {
@@ -271,11 +180,6 @@ export default function CheckoutPage() {
         />
       </div>
     )
-  }
-
-  const handleConfirmed = () => {
-    clearCart()
-    setStep('confirmed')
   }
 
   const displayTotal = serverTotal ?? orderTotal
@@ -468,64 +372,87 @@ export default function CheckoutPage() {
               </motion.div>
             )}
 
-            {/* Step 3: Payment — Stripe Elements */}
+            {/* Step 3: Payment — Square Web Payments SDK */}
             {step === 'payment' && (
               <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} className="bg-white rounded-3xl border border-[#cce7f0] shadow-sm overflow-hidden">
                 <div className="p-5 border-b border-[#cce7f0] flex items-center gap-2">
                   <CreditCard className="w-5 h-5 text-[#0097a7]" />
                   <h2 className="font-bold text-[#0c2340]">Payment Details</h2>
-                  <span className="ml-auto text-xs text-[#4a7fa5] bg-[#f0f9ff] px-2 py-1 rounded-full">🔒 Secured by Stripe</span>
+                  <span className="ml-auto text-xs text-[#4a7fa5] bg-[#f0f9ff] px-2 py-1 rounded-full">🔒 Secured by Square</span>
                 </div>
 
-                {loadingIntent && (
-                  <div className="p-10 flex items-center justify-center gap-3 text-[#4a7fa5]">
-                    <motion.div
-                      animate={{ rotate: 360 }}
-                      transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
-                      className="w-5 h-5 border-2 border-[#cce7f0] border-t-[#0097a7] rounded-full"
-                    />
-                    Initializing secure payment...
-                  </div>
-                )}
-
-                {intentError && (
-                  <div className="p-5">
-                    <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-4 mb-4">
+                <div className="p-5 space-y-4">
+                  {intentError && (
+                    <div className="flex items-center gap-2 text-sm text-red-600 bg-red-50 border border-red-200 rounded-xl p-3">
                       <AlertCircle className="w-4 h-4 shrink-0" />
                       {intentError}
                     </div>
-                    <div className="flex gap-3">
-                      <Button variant="outline" onClick={() => setStep('address')} className="flex-1 border-[#cce7f0]">Back</Button>
-                      <Button onClick={createIntent} className="flex-1 bg-[#0097a7] text-white">Try Again</Button>
-                    </div>
-                  </div>
-                )}
+                  )}
 
-                {clientSecret && !loadingIntent && (
-                  <Elements
-                    stripe={stripePromise}
-                    options={{
-                      clientSecret,
-                      appearance: {
-                        theme: 'stripe',
-                        variables: {
-                          colorPrimary: '#0097a7',
-                          colorBackground: '#ffffff',
-                          colorText: '#0c2340',
-                          colorDanger: '#dc2626',
-                          fontFamily: 'inherit',
-                          borderRadius: '12px',
-                        },
-                      },
+                  {processing && (
+                    <div className="flex items-center justify-center gap-3 text-[#4a7fa5] py-4">
+                      <motion.div
+                        animate={{ rotate: 360 }}
+                        transition={{ repeat: Infinity, duration: 1, ease: 'linear' }}
+                        className="w-5 h-5 border-2 border-[#cce7f0] border-t-[#0097a7] rounded-full"
+                      />
+                      Processing payment...
+                    </div>
+                  )}
+
+                  <PaymentForm
+                    applicationId={process.env.NEXT_PUBLIC_SQUARE_APPLICATION_ID ?? ''}
+                    locationId={process.env.NEXT_PUBLIC_SQUARE_LOCATION_ID ?? ''}
+                    cardTokenizeResponseReceived={async (token) => {
+                      if (token.status === 'OK' && token.token) {
+                        await handleCardTokenized({ token: token.token })
+                      } else {
+                        setIntentError('Card tokenization failed. Please check your card details and try again.')
+                      }
                     }}
+                    createPaymentRequest={() => ({
+                      countryCode: 'CA',
+                      currencyCode: 'CAD',
+                      total: {
+                        amount: displayTotal.toFixed(2),
+                        label: 'TajWater Order',
+                      },
+                    })}
                   >
-                    <StripePaymentForm
-                      orderTotal={displayTotal}
-                      onSuccess={handleConfirmed}
-                      onBack={() => setStep('address')}
-                    />
-                  </Elements>
-                )}
+                    <SquareCreditCard
+                      buttonProps={{
+                        css: {
+                          backgroundColor: '#0097a7',
+                          color: '#fff',
+                          fontSize: '14px',
+                          fontWeight: '600',
+                          borderRadius: '12px',
+                          padding: '12px 0',
+                          '&:hover': {
+                            backgroundColor: '#00838f',
+                          },
+                        },
+                      }}
+                    >
+                      {processing ? 'Processing...' : `Pay $${displayTotal.toFixed(2)}`}
+                    </SquareCreditCard>
+                  </PaymentForm>
+
+                  <p className="text-xs text-[#4a7fa5]">
+                    We also accept e-Transfer and cash on delivery — call us to arrange.
+                  </p>
+                  <p className="text-xs text-[#4a7fa5]">
+                    By completing your purchase you agree to our{' '}
+                    <a href="/legal/terms" target="_blank" className="underline hover:text-[#0097a7]">Terms of Service</a>
+                    {' '}and{' '}
+                    <a href="/legal/privacy" target="_blank" className="underline hover:text-[#0097a7]">Privacy Policy</a>.
+                  </p>
+                  <div className="pt-2">
+                    <Button type="button" variant="outline" onClick={() => setStep('address')} className="border-[#cce7f0]">
+                      Back
+                    </Button>
+                  </div>
+                </div>
               </motion.div>
             )}
           </div>

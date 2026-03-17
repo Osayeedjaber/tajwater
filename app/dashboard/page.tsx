@@ -56,60 +56,73 @@ export default function DashboardPage() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { session } } = await supabase.auth.getSession()
-      if (!session) return
+      try {
+        const { data: { session } } = await supabase.auth.getSession()
+        if (!session) {
+          setLoading(false)
+          return
+        }
 
-      const userId = session.user.id
-      const name = session.user.user_metadata?.name || session.user.email || 'Customer'
-      setUserName(name.split(' ')[0])
+        const userId = session.user.id
+        const name = session.user.user_metadata?.name || session.user.email || 'Customer'
+        setUserName(name.split(' ')[0])
 
-      // Load profile
-      const { data: profile } = await supabase
-        .from('profiles')
-        .select('wallet_balance')
-        .eq('id', userId)
-        .maybeSingle()
+        // Load profile and orders in parallel
+        const [profileRes, ordersRes] = await Promise.all([
+          supabase.from('profiles').select('wallet_balance').eq('id', userId).maybeSingle(),
+          supabase
+            .from('orders')
+            .select('id, status, payment_status, total, delivery_address, created_at, order_items(quantity, product:products(name))')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false }),
+        ])
 
-      const walletBal = profile?.wallet_balance ?? 0
-      setWalletBalance(walletBal)
+        setWalletBalance(profileRes.data?.wallet_balance ?? 0)
 
-      // Load orders with items for stats + recent
-      const { data: orders } = await supabase
-        .from('orders')
-        .select('id, status, payment_status, total, delivery_address, created_at, order_items(quantity, product:products(name))')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-
-      if (orders) {
+        const orders = ordersRes.data ?? []
         setOrderCount(orders.length)
+
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const totalJugs = (orders as any[]).reduce((sum: number, o: any) => {
           return sum + (Array.isArray(o.order_items) ? o.order_items : []).reduce((s: number, item: any) => s + (item.quantity ?? 0), 0)
         }, 0)
         setJugsOrdered(totalJugs)
+
+        // Count all orders toward totalSpent, not just 'paid' — paid status relies on webhook
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const spent = (orders as unknown as any[])
-          .filter((o) => o.payment_status === 'paid')
+          .filter((o) => o.payment_status === 'paid' || o.payment_status === 'processing')
           .reduce((s: number, o: { total: number }) => s + Number(o.total ?? 0), 0)
         setTotalSpent(spent)
         setRecentOrders(orders.slice(0, 3) as unknown as Order[])
-        // Latest non-delivered, non-cancelled order for status alert
+
         const activeStatuses = ['pending', 'processing', 'out_for_delivery']
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         const activeOrder = (orders as unknown as any[]).find((o: { status: string }) => activeStatuses.includes(o.status))
         if (activeOrder) setLatestActiveOrder(activeOrder as Order)
+
+        // Load subscription (active OR paused — anything not cancelled)
+        const { data: sub } = await supabase
+          .from('subscriptions')
+          .select('*, product:products(name, price)')
+          .eq('user_id', userId)
+          .neq('status', 'cancelled')
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle()
+
+        // Normalise product field — Supabase FK join can return array or object
+        if (sub) {
+          const rawProduct = (sub as { product: Subscription['product'] | Subscription['product'][] }).product
+          setSubscription({ ...sub, product: Array.isArray(rawProduct) ? (rawProduct[0] ?? null) : rawProduct } as Subscription)
+        } else {
+          setSubscription(null)
+        }
+      } catch (err) {
+        console.error('Dashboard load error:', err)
+      } finally {
+        setLoading(false)
       }
-
-      // Load subscription
-      const { data: sub } = await supabase
-        .from('subscriptions')
-        .select('*, product:products(name, price)')
-        .eq('user_id', userId)
-        .eq('status', 'active')
-        .maybeSingle()
-
-      setSubscription(sub || null)
-      setLoading(false)
     }
     load()
   }, [])
